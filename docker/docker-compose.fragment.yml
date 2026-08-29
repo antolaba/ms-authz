@@ -1,0 +1,51 @@
+# ms-authz — docker-compose fragment
+#
+# This is NOT run from here. It documents the service block that estudio-contable-infra's
+# docker-compose.yml would add once ms-authz is wired into a system's local stack
+# (MS-AUTHZ-SPEC.md §6, §12 step 3) — this repo does not touch other repos, so nothing here is
+# applied automatically. Copy the `ms-authz` service below into the target compose file, next to
+# `openfga` and `openfga-migrate`, which infra already has.
+#
+# Build context is this repo's root (ms-authz/), not this docker/ directory — see the comment at
+# the top of src/MsAuthz.Api/Dockerfile.
+
+services:
+  ms-authz:
+    build:
+      context: ../ms-authz   # path relative to the infra repo; adjust to the real checkout location
+      dockerfile: src/MsAuthz.Api/Dockerfile
+    environment:
+      Database__ConnectionString: "Host=postgres;Port=5432;Database=authz;Username=${AUTHZ_DB_USER:-authz_user};Password=${AUTHZ_DB_PASSWORD:-authz_password}"
+      OpenFga__ApiUrl: "http://openfga:8080"          # container-internal port — openfga's HTTP default, not the host-remapped 8082
+      OpenFga__StoreId: "${OPENFGA_STORE_ID}"
+      OpenFga__AuthorizationModelId: "${OPENFGA_AUTHORIZATION_MODEL_ID:-}"
+      Security__ApiKey: "${MS_AUTHZ_API_KEY}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      openfga:
+        condition: service_started
+    ports:
+      # dev convenience only — see README's security boundary. In qa/staging/prod this MUST NOT be
+      # published: ms-authz trusts its caller completely (no JWT validation), so it can only ever be
+      # reachable from inside the compose network.
+      - "6010:6010"
+    restart: unless-stopped
+
+  # Liquibase migration for the `authz` catalog database, same profile-gated pattern as infra's own
+  # `liquibase` service.
+  ms-authz-liquibase:
+    image: liquibase/liquibase:4.24-alpine
+    environment:
+      LIQUIBASE_COMMAND_URL: "jdbc:postgresql://postgres:5432/authz"
+      LIQUIBASE_COMMAND_USERNAME: "${AUTHZ_DB_USER:-authz_user}"
+      LIQUIBASE_COMMAND_PASSWORD: "${AUTHZ_DB_PASSWORD:-authz_password}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../ms-authz/liquibase/changelog:/liquibase/changelog
+      - ../ms-authz/liquibase/liquibase.properties:/liquibase/liquibase.properties
+    profiles:
+      - migration
+    command: --defaults-file=/liquibase/liquibase.properties update

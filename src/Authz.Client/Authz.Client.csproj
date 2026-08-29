@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- NuGet package metadata — same molde as FileStore.Client (MS-AUTHZ-SPEC.md §8). Consumed by
+         every .NET system that wants ms-authz enforcement: pull-cached IAuthzClient,
+         RequirePermissionAttribute, and the MediatR PermissionAuthorizationBehavior. -->
+    <PackageId>Authz.Client</PackageId>
+    <Version>1.1.0</Version>
+    <Authors>Estudio-Martinez</Authors>
+    <Description>Client SDK for ms-authz: pull-cached effective-permissions lookup, RequirePermissionAttribute, a MediatR pipeline behavior enforcing it, and IAuthzAdminClient for role-administration operations (catalog listing, reading/replacing a user's roles). See MS-AUTHZ-SPEC.md §8, §12 step 8.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" Condition="Exists('README.md')" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MediatR" Version="12.5.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.9" />
+  </ItemGroup>
+
+</Project>

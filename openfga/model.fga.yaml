@@ -1,0 +1,155 @@
+name: ms-authz — validación del modelo (§3/§4/§5 de MS-AUTHZ-SPEC.md)
+model_file: model.fga
+tuples:
+  # --- Caso 1/2: rol -> permiso directo, en jurol ---
+  - user: user:u-vendedor
+    relation: assignee
+    object: role:jurol|vendedor
+  - user: role:jurol|vendedor#assignee
+    relation: granted
+    object: permission:jurol|Sales.Write
+  - user: role:jurol|vendedor#assignee
+    relation: granted
+    object: permission:jurol|Sales.Read
+
+  # --- Caso 3: union de dos roles del mismo tenant ---
+  - user: user:u-vendedor-stock
+    relation: assignee
+    object: role:jurol|vendedor
+  - user: user:u-vendedor-stock
+    relation: assignee
+    object: role:jurol|stock
+  - user: role:jurol|stock#assignee
+    relation: granted
+    object: permission:jurol|Stock.Write
+
+  # --- Caso 4: jerarquia de roles (gerente hereda de vendedor) ---
+  # OJO a la direccion: "role:jurol|gerente#assignee" es "assignee" de
+  # "role:jurol|vendedor" -> cualquiera que sea assignee de gerente,
+  # automaticamente es assignee de vendedor (y por lo tanto hereda sus
+  # permisos). Al reves (vendedor asignado a gerente) NO compilaria como
+  # "hereda de", daria el sentido opuesto.
+  - user: role:jurol|gerente#assignee
+    relation: assignee
+    object: role:jurol|vendedor
+  - user: user:u-gerente
+    relation: assignee
+    object: role:jurol|gerente
+  # permiso exclusivo de gerente, para probar que la herencia va en un solo
+  # sentido: vendedor NO debe heredar esto de gerente.
+  - user: role:jurol|gerente#assignee
+    relation: granted
+    object: permission:jurol|Management.Approve
+
+  # --- Caso 5: aislamiento entre tenants ---
+  # u-crosstenant es vendedor SOLO en jurol.
+  - user: user:u-crosstenant
+    relation: assignee
+    object: role:jurol|vendedor
+  # Existe un rol con el MISMO code en otro tenant, y ese si tiene el permiso
+  # concedido. Sin estas dos tuplas el caso 5 pasaria por la razon equivocada:
+  # daria false porque el permiso no existe, no porque el aislamiento funcione.
+  - user: role:otraempresa|vendedor#assignee
+    relation: granted
+    object: permission:otraempresa|Sales.Write
+
+  # --- Caso 6: user:u-norol no tiene ninguna tupla (a proposito) ---
+
+  # --- Caso 7: ListObjects cruza tenants ---
+  - user: user:u-multitenant
+    relation: assignee
+    object: role:jurol|vendedor
+  - user: user:u-multitenant
+    relation: assignee
+    object: role:otraempresa|admin
+  - user: role:otraempresa|admin#assignee
+    relation: granted
+    object: permission:otraempresa|Purchasing.ApproveOrder
+
+tests:
+  - name: "Caso 1 — permiso directo por rol (true)"
+    check:
+      - user: user:u-vendedor
+        object: permission:jurol|Sales.Write
+        assertions:
+          granted: true
+
+  - name: "Caso 2 — permiso que el usuario NO tiene (false)"
+    check:
+      - user: user:u-vendedor
+        object: permission:jurol|Purchasing.ApproveOrder
+        assertions:
+          granted: false
+
+  - name: "Caso 3 — union de dos roles del mismo tenant (vendedor + stock)"
+    check:
+      - user: user:u-vendedor-stock
+        object: permission:jurol|Sales.Write
+        assertions:
+          granted: true
+      - user: user:u-vendedor-stock
+        object: permission:jurol|Stock.Write
+        assertions:
+          granted: true
+
+  - name: "Caso 4 — jerarquia: gerente hereda los permisos de vendedor, y solo en ese sentido"
+    check:
+      # u-gerente solo tiene el rol gerente asignado; debe obtener el
+      # permiso de vendedor (Sales.Write) por herencia.
+      - user: user:u-gerente
+        object: permission:jurol|Sales.Write
+        assertions:
+          granted: true
+      # y tambien conserva su propio permiso exclusivo.
+      - user: user:u-gerente
+        object: permission:jurol|Management.Approve
+        assertions:
+          granted: true
+      # direccion: un vendedor NO debe heredar el permiso exclusivo de
+      # gerente (si esto diera true, la tupla de jerarquia estaria invertida).
+      - user: user:u-vendedor
+        object: permission:jurol|Management.Approve
+        assertions:
+          granted: false
+
+  - name: "Caso 5 — aislamiento entre tenants (false), contra permisos que SI estan concedidos en el otro tenant"
+    check:
+      # El permiso existe y esta concedido a role:otraempresa|vendedor, que
+      # tiene el mismo code que el rol de u-crosstenant en jurol. Si el
+      # aislamiento por prefijo de tenant fallara, esto daria true.
+      - user: user:u-crosstenant
+        object: permission:otraempresa|Sales.Write
+        assertions:
+          granted: false
+      # Mismo control contra un permiso de otro tenant concedido a otro rol.
+      - user: user:u-crosstenant
+        object: permission:otraempresa|Purchasing.ApproveOrder
+        assertions:
+          granted: false
+      # Y el control positivo: en su propio tenant el mismo rol si funciona,
+      # asi el caso no puede pasar por estar todo roto.
+      - user: user:u-crosstenant
+        object: permission:jurol|Sales.Write
+        assertions:
+          granted: true
+
+  - name: "Caso 6 — usuario sin ningun rol (false)"
+    check:
+      - user: user:u-norol
+        object: permission:jurol|Sales.Write
+        assertions:
+          granted: false
+      - user: user:u-norol
+        object: permission:jurol|Purchasing.ApproveOrder
+        assertions:
+          granted: false
+
+  - name: "Caso 7 — ListObjects devuelve permisos de TODOS los tenants del usuario (evidencia empirica del filtrado del lado del cliente que exige la spec en §4)"
+    list_objects:
+      - user: user:u-multitenant
+        type: permission
+        assertions:
+          granted:
+            - permission:jurol|Sales.Write
+            - permission:jurol|Sales.Read
+            - permission:otraempresa|Purchasing.ApproveOrder

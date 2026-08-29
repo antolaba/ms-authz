@@ -1,0 +1,12 @@
+model
+  schema 1.1
+
+type user
+
+type role
+  relations
+    define assignee: [user, role#assignee]
+
+type permission
+  relations
+    define granted: [role#assignee]

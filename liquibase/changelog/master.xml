@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.24.xsd">
+
+    <!-- =================================================================== -->
+    <!-- ms-authz MASTER CHANGELOG                                          -->
+    <!-- One database (`authz`), no per-tenant split — the catalog is       -->
+    <!-- global to the system that owns this ms-authz instance              -->
+    <!-- (MS-AUTHZ-SPEC.md §5). Convention copied from                      -->
+    <!-- estudio-contable-infra/liquibase/changelog/master.xml.             -->
+    <!-- =================================================================== -->
+
+    <include file="001-create-roles-table.sql" relativeToChangelogFile="true"/>
+    <include file="002-create-permissions-table.sql" relativeToChangelogFile="true"/>
+    <include file="003-create-role-permissions-table.sql" relativeToChangelogFile="true"/>
+    <include file="004-create-tenants-table.sql" relativeToChangelogFile="true"/>
+
+    <!-- Permission and role catalog. Mirrors the menu_modules taxonomy of
+         estudio-contable: Read/Write per menu item plus explicit codes for the
+         10 sensitive operations. See the file header. -->
+    <include file="005-seed-catalog.sql" relativeToChangelogFile="true"/>
+
+</databaseChangeLog>

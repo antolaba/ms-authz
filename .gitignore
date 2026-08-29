@@ -1,0 +1,13 @@
+bin/
+obj/
+*.user
+.vs/
+.idea/
+*.DotSettings.user
+
+# Local overrides — never commit real secrets (API key, DB password, OpenFGA store id)
+appsettings.Local.json
+appsettings.*.local.json
+.env
+.env.*
+!.env.example
