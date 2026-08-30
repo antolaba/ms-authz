@@ -15,6 +15,9 @@
     <Authors>Estudio-Martinez</Authors>
     <Description>Client SDK for ms-authz: pull-cached effective-permissions lookup, RequirePermissionAttribute, a MediatR pipeline behavior enforcing it, and IAuthzAdminClient for role-administration operations (catalog listing, reading/replacing a user's roles). See MS-AUTHZ-SPEC.md §8, §12 step 8.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>authz;authorization;openfga;rbac</PackageTags>
+    <RepositoryUrl>https://github.com/antolaba/ms-authz</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
   <ItemGroup>
