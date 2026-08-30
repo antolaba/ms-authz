@@ -82,11 +82,10 @@ live stack:
    liquibase --defaults-file=liquibase.properties update
    ```
    (or via the `ms-authz-liquibase` service in `docker/docker-compose.fragment.yml`).
-3. An OpenFGA instance + store, with the model loaded from
-   `estudio-contable-infra/openfga/model.fga` (`fga model write --store-id <id> --file model.fga`,
+3. An OpenFGA instance + store, with the model loaded from this repo's `openfga/model.fga`
+   (`./scripts/bootstrap-openfga.sh`, or `fga model write --store-id <id> --file openfga/model.fga`,
    or the OpenFGA Playground in dev). That file is the validated, canonical model
-   (MS-AUTHZ-SPEC.md §3, §12 step 2) — it is **not** duplicated into this repo on purpose, to avoid
-   a second copy drifting out of sync. Any .NET system adopting ms-authz loads the same file into its
+   (MS-AUTHZ-SPEC.md §3, §12 step 2). Any .NET system adopting ms-authz loads the same file into its
    own store, unmodified.
 4. `appsettings.Development.json` in `src/MsAuthz.Api` already points at the conventional local
    ports (Postgres `5432`, OpenFGA `8082`) — fill in `OpenFga:StoreId` with your store's id.

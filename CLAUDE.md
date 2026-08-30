@@ -59,14 +59,24 @@ either MUST filter the result through `OpenFgaIdentifiers.TryStripTenantPrefix` 
 `TryStripTenantRolePrefix` before doing anything with it. `EffectivePermissionsService` and
 `UserRoleService` are the two existing examples — follow their shape for anything new.
 
-## Idempotency is achieved via OpenFGA's conflict options, not read-before-write
+## Idempotency is achieved via OpenFGA's conflict options, not read-before-write — except where the operation is genuinely a replace
 
 `OpenFgaGateway.WriteTuplesAsync`/`DeleteTuplesAsync` pass `OnDuplicateWrites.Ignore` /
-`OnMissingDeletes.Ignore` to the SDK's `ClientWriteOptions.Conflict`. This is what makes tenant
-provisioning and catalog sync safe to re-run without reading current state first — don't reintroduce a
-read-then-diff pattern for that idempotency; it already exists at the OpenFGA call itself. (`UserRoleService`
-still does its own read-then-diff, but for a different reason: `PUT /users/{id}/roles` is a *replace*
-operation and genuinely needs to know what to delete, not just what to add.)
+`OnMissingDeletes.Ignore` to the SDK's `ClientWriteOptions.Conflict`. This is what makes an add-only
+write safe to re-run without reading current state first — don't reach for read-then-diff just to get
+idempotency; it already exists at the OpenFGA call itself.
+
+Two call sites do read-then-diff anyway, both for the same reason: the operation is a *replace*, not a
+plain add, so the service genuinely needs to know what's currently there in order to know what to
+remove.
+- `UserRoleService.SetUserRolesAsync` — `PUT /users/{id}/roles` replaces a user's whole role set.
+- `TenantProvisioningService.ProvisionTenantAsync` — a role's permission set in the catalog is the
+  source of truth, so re-provisioning a tenant (including via `POST /catalog/sync`) must revoke a
+  permission the catalog no longer grants a role, not just add newly-granted ones. It diffs per role
+  via `IOpenFgaGateway.ReadObjectsForUserAsync` against the role's assignee userset.
+
+Both delete before add, so a failure partway through leaves the tenant/user under-granted rather than
+over-granted — that's the direction to fail in if you add a third case.
 
 ## The `tenants` table is ms-authz's own addition, not part of MS-AUTHZ-SPEC.md §5's schema
 
