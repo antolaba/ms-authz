@@ -22,5 +22,6 @@
          estudio-contable: Read/Write per menu item plus explicit codes for the
          10 sensitive operations. See the file header. -->
     <include file="005-seed-catalog.sql" relativeToChangelogFile="true"/>
+    <include file="006-add-not-null-created-at.sql" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>
