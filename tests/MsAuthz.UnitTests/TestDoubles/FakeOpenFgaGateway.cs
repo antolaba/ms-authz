@@ -38,7 +38,7 @@ public class FakeOpenFgaGateway : IOpenFgaGateway
     public Task<IReadOnlyList<string>> ReadObjectsForUserAsync(string user, string relation, string objectType, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<string> result = _tuples
-            .Where(t => t.User == user && t.Relation == relation)
+            .Where(t => t.User == user && t.Relation == relation && t.Object.StartsWith($"{objectType}:", StringComparison.Ordinal))
             .Select(t => t.Object)
             .ToList();
 
