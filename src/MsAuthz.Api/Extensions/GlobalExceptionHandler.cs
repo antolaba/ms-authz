@@ -17,7 +17,6 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
     {
         var (statusCode, title) = exception switch
         {
-            CatalogEntryNotFoundException => (StatusCodes.Status404NotFound, "Catalog entry not found"),
             InvalidCatalogRequestException => (StatusCodes.Status400BadRequest, "Invalid request"),
             ArgumentException => (StatusCodes.Status400BadRequest, "Invalid request"),
             _ => (StatusCodes.Status500InternalServerError, "Unexpected error"),

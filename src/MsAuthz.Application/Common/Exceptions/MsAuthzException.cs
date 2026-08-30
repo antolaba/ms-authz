@@ -8,8 +8,5 @@ namespace MsAuthz.Application.Common.Exceptions;
 /// </summary>
 public abstract class MsAuthzException(string message) : Exception(message);
 
-/// <summary>The requested catalog entry (role or permission) does not exist.</summary>
-public sealed class CatalogEntryNotFoundException(string message) : MsAuthzException(message);
-
 /// <summary>The caller asked for something structurally invalid (e.g. an unknown role code in a PUT).</summary>
 public sealed class InvalidCatalogRequestException(string message) : MsAuthzException(message);
