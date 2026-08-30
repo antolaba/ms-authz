@@ -14,9 +14,6 @@ public class CatalogSyncService(
 
         var tenantCodes = await tenantRegistry.GetAllTenantCodesAsync(cancellationToken);
 
-        // Re-running provisioning is exactly the re-expansion this endpoint promises: it writes
-        // every role->permission tuple the catalog now says should exist, and is idempotent for
-        // tuples that already do (MS-AUTHZ-SPEC.md §5).
         foreach (var tenantCode in tenantCodes)
             await tenantProvisioningService.ProvisionTenantAsync(tenantCode, cancellationToken);
 

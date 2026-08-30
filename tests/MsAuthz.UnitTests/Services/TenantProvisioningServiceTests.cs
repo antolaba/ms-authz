@@ -90,4 +90,75 @@ public class TenantProvisioningServiceTests
             OpenFgaIdentifiers.Permission("otraempresa", "Sales.Read")));
         gateway.Tuples.Should().HaveCount(2);
     }
+
+    [Fact]
+    public async Task ProvisionTenantAsync_revokes_a_permission_the_catalog_no_longer_grants_a_role()
+    {
+        var registry = new FakeTenantRegistry();
+        var gateway = new FakeOpenFgaGateway();
+
+        var catalogBefore = new FakeCatalogRepository().WithRole("vendedor", "Vendedor", "Sales.Read", "Sales.Write");
+        var sutBefore = new TenantProvisioningService(catalogBefore, registry, gateway, TestLogger.For<TenantProvisioningService>());
+        await sutBefore.ProvisionTenantAsync("jurol");
+
+        var catalogAfter = new FakeCatalogRepository().WithRole("vendedor", "Vendedor", "Sales.Read");
+        var sutAfter = new TenantProvisioningService(catalogAfter, registry, gateway, TestLogger.For<TenantProvisioningService>());
+        await sutAfter.ProvisionTenantAsync("jurol");
+
+        gateway.Tuples.Should().Contain((
+            OpenFgaIdentifiers.RoleAssigneeUserset("jurol", "vendedor"),
+            OpenFgaIdentifiers.GrantedRelation,
+            OpenFgaIdentifiers.Permission("jurol", "Sales.Read")));
+        gateway.Tuples.Should().NotContain((
+            OpenFgaIdentifiers.RoleAssigneeUserset("jurol", "vendedor"),
+            OpenFgaIdentifiers.GrantedRelation,
+            OpenFgaIdentifiers.Permission("jurol", "Sales.Write")));
+    }
+
+    [Fact]
+    public async Task ProvisionTenantAsync_revoking_a_permission_in_one_tenant_does_not_touch_another_tenant()
+    {
+        var registry = new FakeTenantRegistry();
+        var gateway = new FakeOpenFgaGateway();
+
+        var catalogBefore = new FakeCatalogRepository().WithRole("vendedor", "Vendedor", "Sales.Read", "Sales.Write");
+        var sutBefore = new TenantProvisioningService(catalogBefore, registry, gateway, TestLogger.For<TenantProvisioningService>());
+        await sutBefore.ProvisionTenantAsync("jurol");
+        await sutBefore.ProvisionTenantAsync("otraempresa");
+
+        var catalogAfter = new FakeCatalogRepository().WithRole("vendedor", "Vendedor", "Sales.Read");
+        var sutAfter = new TenantProvisioningService(catalogAfter, registry, gateway, TestLogger.For<TenantProvisioningService>());
+        await sutAfter.ProvisionTenantAsync("jurol");
+
+        gateway.Tuples.Should().NotContain((
+            OpenFgaIdentifiers.RoleAssigneeUserset("jurol", "vendedor"),
+            OpenFgaIdentifiers.GrantedRelation,
+            OpenFgaIdentifiers.Permission("jurol", "Sales.Write")));
+        gateway.Tuples.Should().Contain((
+            OpenFgaIdentifiers.RoleAssigneeUserset("otraempresa", "vendedor"),
+            OpenFgaIdentifiers.GrantedRelation,
+            OpenFgaIdentifiers.Permission("otraempresa", "Sales.Write")),
+            "re-provisioning jurol against a narrower catalog must not revoke otraempresa's grants");
+    }
+
+    [Theory]
+    [InlineData("acme|prod")]
+    [InlineData("acme#prod")]
+    [InlineData("acme:prod")]
+    [InlineData("acme corp")]
+    [InlineData("")]
+    public async Task ProvisionTenantAsync_rejects_an_invalid_tenant_code_without_registering_it(string invalidTenantCode)
+    {
+        var catalog = new FakeCatalogRepository().WithRole("vendedor", "Vendedor", "Sales.Read");
+        var registry = new FakeTenantRegistry();
+        var gateway = new FakeOpenFgaGateway();
+        var sut = new TenantProvisioningService(catalog, registry, gateway, TestLogger.For<TenantProvisioningService>());
+
+        var act = () => sut.ProvisionTenantAsync(invalidTenantCode);
+
+        await act.Should().ThrowAsync<ArgumentException>();
+        (await registry.GetAllTenantCodesAsync()).Should().BeEmpty(
+            "an invalid tenant code must never be persisted — it would break every future catalog/sync run");
+        gateway.Tuples.Should().BeEmpty();
+    }
 }

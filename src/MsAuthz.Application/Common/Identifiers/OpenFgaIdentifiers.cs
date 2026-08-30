@@ -22,6 +22,10 @@ public static class OpenFgaIdentifiers
     public const string GrantedRelation = "granted";
     public const char TenantSeparator = '|';
 
+    /// <summary>Validates a tenant code without building any object from it.</summary>
+    public static void EnsureValidTenantCode(string tenantCode)
+        => EnsureValidComponent(tenantCode, nameof(tenantCode));
+
     /// <summary>Builds the "user:&lt;id&gt;" object for a Keycloak user id.</summary>
     public static string User(string keycloakUserId)
     {
