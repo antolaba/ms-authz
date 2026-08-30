@@ -1,0 +1,17 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/Authz.Client/Authz.Client.csproj" />
+    <Project Path="src/MsAuthz.Api/MsAuthz.Api.csproj" />
+    <Project Path="src/MsAuthz.Application/MsAuthz.Application.csproj" />
+    <Project Path="src/MsAuthz.Infrastructure/MsAuthz.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Authz.Client.UnitTests/Authz.Client.UnitTests.csproj" />
+    <Project Path="tests/MsAuthz.UnitTests/MsAuthz.UnitTests.csproj" />
+  </Folder>
+</Solution>
