@@ -52,20 +52,20 @@ public class UserRoleService(
         var toAdd = desiredCodes.Except(currentCodes, StringComparer.Ordinal).ToList();
         var toRemove = currentCodes.Except(desiredCodes, StringComparer.Ordinal).ToList();
 
-        if (toAdd.Count > 0)
-        {
-            var writes = toAdd
-                .Select(code => new OpenFgaTupleKey(user, OpenFgaIdentifiers.AssigneeRelation, OpenFgaIdentifiers.Role(tenantCode, code)))
-                .ToList();
-            await openFgaGateway.WriteTuplesAsync(writes, cancellationToken);
-        }
-
         if (toRemove.Count > 0)
         {
             var deletes = toRemove
                 .Select(code => new OpenFgaTupleKey(user, OpenFgaIdentifiers.AssigneeRelation, OpenFgaIdentifiers.Role(tenantCode, code)))
                 .ToList();
             await openFgaGateway.DeleteTuplesAsync(deletes, cancellationToken);
+        }
+
+        if (toAdd.Count > 0)
+        {
+            var writes = toAdd
+                .Select(code => new OpenFgaTupleKey(user, OpenFgaIdentifiers.AssigneeRelation, OpenFgaIdentifiers.Role(tenantCode, code)))
+                .ToList();
+            await openFgaGateway.WriteTuplesAsync(writes, cancellationToken);
         }
 
         logger.LogInformation(
