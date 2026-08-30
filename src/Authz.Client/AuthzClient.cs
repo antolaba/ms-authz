@@ -42,6 +42,8 @@ public class AuthzClient(
         return permissions;
     }
 
-    private static string BuildCacheKey(string tenantCode, string subjectId)
-        => $"authz-client:permissions:{tenantCode}:{subjectId}";
+    private sealed record CacheKey(string TenantCode, string SubjectId);
+
+    private static CacheKey BuildCacheKey(string tenantCode, string subjectId)
+        => new(tenantCode, subjectId);
 }
