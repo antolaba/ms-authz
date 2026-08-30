@@ -1,0 +1,43 @@
+name: Publish Authz.Client
+
+on:
+  push:
+    tags:
+      - 'client-v*.*.*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.x'
+          source-url: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#client-v}" >> $GITHUB_OUTPUT
+
+      - name: Restore
+        run: dotnet restore src/Authz.Client/Authz.Client.csproj
+
+      - name: Pack
+        run: |
+          dotnet pack src/Authz.Client/Authz.Client.csproj \
+            -c Release \
+            /p:Version=${{ steps.version.outputs.VERSION }} \
+            -o ./artifacts
+
+      - name: Push to GitHub Packages
+        run: |
+          dotnet nuget push ./artifacts/*.nupkg \
+            --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+            --api-key ${{ secrets.GITHUB_TOKEN }} \
+            --skip-duplicate
