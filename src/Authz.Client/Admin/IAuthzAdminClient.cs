@@ -2,8 +2,9 @@ namespace Authz.Client.Admin;
 
 /// <summary>
 /// Administration operations against a system's own ms-authz instance: reading the readable role
-/// catalog and reading/replacing a user's role assignments in a tenant (MS-AUTHZ-SPEC.md §7, §12 step
-/// 8 — the backend side of the role-administration screen).
+/// catalog, reading/replacing a user's role assignments in a tenant (MS-AUTHZ-SPEC.md §7, §12 step
+/// 8 — the backend side of the role-administration screen), and provisioning tenants / syncing the
+/// catalog (MS-AUTHZ-SPEC.md §5).
 ///
 /// Deliberately a separate interface from <see cref="IAuthzClient"/>, and deliberately uncached:
 /// <see cref="IAuthzClient.GetEffectivePermissionsAsync"/> is the hot-path pull-cache (§8, 5 min TTL)
@@ -30,4 +31,18 @@ public interface IAuthzAdminClient
     /// </summary>
     Task<IReadOnlyList<AuthzAssignedRoleDto>> ReplaceUserRolesAsync(
         string tenantCode, string userId, IReadOnlyList<string> roleCodes, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Expands the whole catalog into OpenFGA tuples for a new tenant. Idempotent. Throws
+    /// <see cref="Exceptions.AuthzInvalidRequestException"/> for an invalid tenant code.
+    /// </summary>
+    Task ProvisionTenantAsync(string tenantCode, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Re-expands the current catalog into tuples for every tenant code given — run after a
+    /// role/permission change. Idempotent. Throws <see cref="Exceptions.AuthzInvalidRequestException"/>
+    /// for an empty list or an invalid tenant code.
+    /// </summary>
+    Task<IReadOnlyList<string>> SyncCatalogAsync(
+        IReadOnlyList<string> tenantCodes, CancellationToken cancellationToken = default);
 }
