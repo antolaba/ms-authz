@@ -7,7 +7,6 @@
 .dockerignore
 **/*.user
 tests
-liquibase
 docs
 docker
 scripts

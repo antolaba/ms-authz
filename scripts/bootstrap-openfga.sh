@@ -18,7 +18,7 @@
 set -euo pipefail
 
 FGA_URL="${FGA_API_URL:-http://localhost:8082}"
-STORE_NAME="${STORE_NAME:-estudio-contable}"
+STORE_NAME="${STORE_NAME:-ms-authz}"
 MODEL_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/openfga/model.fga"
 
 if ! command -v fga >/dev/null 2>&1; then
@@ -64,14 +64,18 @@ OpenFga__StoreId / OpenFga__AuthorizationModelId environment variables):
     "AuthorizationModelId": "$MODEL_ID"
   }
 
-Next: apply the Liquibase changelog to the 'authz' database (the role and
-permission catalog), then register each tenant so the catalog is materialised
-into tuples:
+Next: mount the catalog file (Catalog__Path) and register each tenant so the
+catalog is materialised into tuples, either one at a time:
 
   curl -X POST http://localhost:6010/tenants \\
     -H "X-Api-Key: \$MS_AUTHZ_API_KEY" \\
     -H "Content-Type: application/json" \\
-    -d '{"tenantCode":"<realm name>"}'
+    -d '{"tenantCode":"<tenant code>"}'
 
-In estudio-contable that last step is already part of create-tenant.sh.
+or all at once, if every tenant code is already known:
+
+  curl -X POST http://localhost:6010/catalog/sync \\
+    -H "X-Api-Key: \$MS_AUTHZ_API_KEY" \\
+    -H "Content-Type: application/json" \\
+    -d '{"tenantCodes":["<tenant code>", "..."]}'
 EOF
