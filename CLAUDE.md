@@ -21,13 +21,13 @@ Three server-side projects, not the four-layer Clean Architecture shape `estudio
 uses:
 
 - `MsAuthz.Api` — controllers, API-key auth, Program.cs, Dockerfile.
-- `MsAuthz.Application` — interfaces + services. **No infrastructure dependency** — no EF, no
-  OpenFga.Sdk reference. Settings classes (`DatabaseSettings`, `OpenFgaSettings`) live in
+- `MsAuthz.Application` — interfaces + services. **No infrastructure dependency** — no
+  OpenFga.Sdk reference, no file I/O. Settings classes (`CatalogSettings`, `OpenFgaSettings`) live in
   Infrastructure instead of a Domain project, because there is no Domain project: they're consumed
   nowhere else.
-- `MsAuthz.Infrastructure` — EF Core/Npgsql against `authz`, and the only class talking to
-  OpenFGA (`OpenFgaGateway`). Everything else in the codebase reaches OpenFGA through
-  `IOpenFgaGateway`.
+- `MsAuthz.Infrastructure` — `FileCatalogRepository` (loads/serves the catalog from a JSON file, see
+  "Catalog is a file, ms-authz is stateless" below) and `OpenFgaGateway`, the only class talking to
+  OpenFGA. Everything else in the codebase reaches OpenFGA through `IOpenFgaGateway`.
 - `Authz.Client` — the NuGet SDK. Separate solution folder, its own README, packable independently.
 
 ## No MediatR / CQRS on the server side — this is a deliberate deviation from `estudio-contable-backend`
@@ -78,25 +78,15 @@ remove.
 Both delete before add, so a failure partway through leaves the tenant/user under-granted rather than
 over-granted — that's the direction to fail in if you add a third case.
 
-## The `tenants` table is ms-authz's own addition, not part of MS-AUTHZ-SPEC.md §5's schema
+## Catalog is a file, ms-authz is stateless
 
-§5 only lists `roles` / `permissions` / `role_permissions` — the catalog is deliberately global, with
-no notion of tenant. But `POST /catalog/sync` ("re-expansión idempotente sobre todos los tenants")
-needs some durable list of tenant codes to iterate, and ms-authz owns no other source of truth for
-that. `ITenantRegistry` / the `tenants` table is the smallest addition that makes §5's own job
-possible — see the doc comment on `ITenantRegistry` for the full reasoning. It is **not** a copy of a
-consuming system's tenant metadata (no realm name, no schema name, no company name) — just the code.
-
-## Migrations: Liquibase, not EF — same rule as every other repo in the workspace
-
-Schema for the `authz` database lives in `liquibase/changelog/`, following the same
-`--liquibase formatted sql` / numbered-file / `master.xml` convention as
-`estudio-contable-infra/liquibase/`. EF Core (`AuthzDbContext`) is a query/write tool over an
-already-migrated schema — it has no `Migrations/` folder and should never grow one.
-
-Adding a column is: a new Liquibase changeset here, **and** the matching entity + `IEntityTypeConfiguration`
-change in `MsAuthz.Infrastructure/Persistence/`. Same two-sided discipline
-`estudio-contable-backend`'s CLAUDE.md describes for its own tables.
+The catalog (roles, permissions, role→permission, names, descriptions — MS-AUTHZ-SPEC.md §5) loads
+once at startup from `Catalog:Path`, a JSON file validated and expanded in memory by
+`CatalogFileLoader`. It fails fast: an invalid or missing catalog stops the process at startup
+(`Program.cs` forces the load before serving any request), it never surfaces as a runtime 500 later.
+Changing the catalog is: new file + redeploy + `POST /catalog/sync` with the tenants that need
+re-expanding. ms-authz does not know what tenants exist — that's the consuming system's job, not a
+list ms-authz keeps for itself (see `POST /catalog/sync`'s body in README.md).
 
 ## Logging pattern
 
@@ -109,11 +99,13 @@ unexpected exception is left to reach `GlobalExceptionHandler`.
 ## Testing without infrastructure
 
 `dotnet build MsAuthz.slnx && dotnet test MsAuthz.slnx` must always succeed with **no** Postgres, no
-OpenFGA, no Docker. `tests/MsAuthz.UnitTests/TestDoubles/` holds in-memory fakes of `IOpenFgaGateway`,
-`ICatalogRepository` and `ITenantRegistry` — extend those, don't reach for a real database or an
-integration-test container for anything covered by this repo's unit tests. If integration tests
-against a real Postgres/OpenFGA are added later, they need their own opt-in project/trait so the
-default `dotnet test` run stays infrastructure-free.
+OpenFGA, no Docker. `tests/MsAuthz.UnitTests/TestDoubles/` holds in-memory fakes of `IOpenFgaGateway`
+and `ICatalogRepository` — extend those, don't reach for a real OpenFGA or a database for anything
+covered by this repo's unit tests. `CatalogFileLoader` is the one piece of Infrastructure worth
+testing directly (it has real parsing/validation logic, not just a thin OpenFGA/HTTP wrapper) —
+`tests/MsAuthz.UnitTests/Catalog/` exercises it against real temp files. If integration tests against
+a real OpenFGA are added later, they need their own opt-in project/trait so the default `dotnet test`
+run stays infrastructure-free.
 
 ## Business codes: there isn't one
 

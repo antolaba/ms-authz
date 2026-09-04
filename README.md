@@ -1,9 +1,10 @@
 # ms-authz
 
-Authorization component over [OpenFGA](https://openfga.dev/). Each system that needs authorization
-runs its **own** instance of ms-authz + OpenFGA + two Postgres databases — nothing is shared between
+Authorization component over [OpenFGA](https://openfga.dev/). `ms-authz` itself is stateless — it has
+no database of its own; OpenFGA is the only persistence. Each system that needs authorization runs
+its **own** instance of ms-authz + OpenFGA (+ OpenFGA's own Postgres) — nothing is shared between
 systems except this repo's code, the `Authz.Client` NuGet package, and the OpenFGA model file. Full
-design rationale lives in `docs/MS-AUTHZ-SPEC.md`.
+design rationale lives in `docs/MS-AUTHZ-SPEC.md` (see §15 for this stateless redesign).
 
 ## ⚠️ Security boundary — read this before deploying anything
 
@@ -25,8 +26,8 @@ compose network only.
 ## What it is
 
 - **A readable catalog.** OpenFGA stores structure, not names or descriptions. `role:jurol|vendedor`
-  has no display name in OpenFGA — that lives in ms-authz's own `authz` Postgres database
-  (`roles`, `permissions`, `role_permissions`).
+  has no display name in OpenFGA — that lives in a JSON file (`Catalog:Path`, see docs/catalog.example.json
+  for the shape), loaded once at startup. ms-authz has no database of its own.
 - **A translator from business operations to OpenFGA tuples.** "Assign the Vendedor role to this user
   in jurol" becomes a `Write` of tuples. "Provision tenant jurol" expands the whole catalog into
   tuples for that tenant. Consuming systems never write OpenFGA tuples by hand — **ms-authz is the
@@ -64,32 +65,26 @@ permissions between companies.
 | `GET /users/{id}/roles?tenant=` | Roles currently assigned to a user in a tenant. |
 | `PUT /users/{id}/roles?tenant=` | Replaces the user's role set in that tenant. Body: `{ "roleCodes": [...] }`. |
 | `POST /tenants` | Provisioning: expands the whole catalog into tuples for a new tenant. Body: `{ "tenantCode": "jurol" }`. Idempotent. |
-| `POST /catalog/sync` | Re-expands the catalog for every known tenant — run after a catalog change. Idempotent. |
+| `POST /catalog/sync` | Re-expands the catalog for the given tenants — run after a catalog change. Body: `{ "tenantCodes": ["jurol", "..."] }`. ms-authz has no list of tenants of its own, so the caller supplies it. Idempotent. |
 | `GET /health` | Liveness, no API key required. |
 
 ## Running locally
 
-No Docker, no real Postgres/OpenFGA is required to build or test this repo — `dotnet build` and
+No Docker, no real OpenFGA, no database is required to build or test this repo — `dotnet build` and
 `dotnet test` both run standalone (see the Testing section). To actually run `MsAuthz.Api` against a
 live stack:
 
-1. A Postgres instance with an `authz` database and `authz_user` (see
-   `estudio-contable-infra/postgres/init/04-create-authorization-resources.sql` for how that's
-   provisioned in the `estudio-contable` system's compose).
-2. Run this repo's Liquibase changelog against it:
-   ```bash
-   cd liquibase
-   liquibase --defaults-file=liquibase.properties update
-   ```
-   (or via the `ms-authz-liquibase` service in `docker/docker-compose.fragment.yml`).
-3. An OpenFGA instance + store, with the model loaded from this repo's `openfga/model.fga`
+1. An OpenFGA instance + store, with the model loaded from this repo's `openfga/model.fga`
    (`./scripts/bootstrap-openfga.sh`, or `fga model write --store-id <id> --file openfga/model.fga`,
    or the OpenFGA Playground in dev). That file is the validated, canonical model
    (MS-AUTHZ-SPEC.md §3, §12 step 2). Any .NET system adopting ms-authz loads the same file into its
    own store, unmodified.
-4. `appsettings.Development.json` in `src/MsAuthz.Api` already points at the conventional local
-   ports (Postgres `5432`, OpenFGA `8082`) — fill in `OpenFga:StoreId` with your store's id.
-5. `dotnet run --project src/MsAuthz.Api`
+2. A catalog file — `Catalog:Path` in configuration, defaulting to `catalog.json` next to the binary.
+   `docs/catalog.example.json` is a small generic example (`appsettings.Development.json` already
+   points at it); a real deployment supplies its own.
+3. `appsettings.Development.json` in `src/MsAuthz.Api` already points at the conventional local
+   OpenFGA port (`8082`) — fill in `OpenFga:StoreId` with your store's id.
+4. `dotnet run --project src/MsAuthz.Api`
 
 The service listens on **port 6010** (MS-AUTHZ-SPEC.md §6), matching the `ms-filestore` family
 (6000/6001).
@@ -97,9 +92,11 @@ The service listens on **port 6010** (MS-AUTHZ-SPEC.md §6), matching the `ms-fi
 ### Docker
 
 `src/MsAuthz.Api/Dockerfile` builds the API image (build context must be the repo root — see the
-comment at the top of the file). `docker/docker-compose.fragment.yml` documents the service block a
-consuming system's infra repo would add — it is **not** wired into any other repo automatically (this
-repo does not touch other repos).
+comment at the top of the file). The catalog file is not baked into the image: the consuming system
+mounts its own at `/app/catalog.json` (see the volume in `docker/docker-compose.fragment.yml`).
+`docker/docker-compose.fragment.yml` documents the service block a consuming system's infra repo
+would add — it is **not** wired into any other repo automatically (this repo does not touch other
+repos).
 
 ## `Authz.Client` — consuming ms-authz from a .NET system
 
@@ -172,18 +169,24 @@ receives a validation error that discloses details about a resource it cannot ac
 it into your global exception handler next to your own forbidden-access exception so both map to the
 same 403.
 
+### `IAuthzAdminClient`
+
+Uncached administration operations, registered separately via `AddAuthzAdminClient`: reading the
+role catalog, reading/replacing a user's roles, `ProvisionTenantAsync(tenantCode)`, and
+`SyncCatalogAsync(tenantCodes)` — the client-side calls for `POST /tenants` and `POST /catalog/sync`.
+
 ## Repository layout
 
 ```
 src/
   MsAuthz.Api/              Controllers, API-key auth, Program.cs, Dockerfile
   MsAuthz.Application/      Interfaces + services. No infrastructure dependency.
-  MsAuthz.Infrastructure/   EF Core/Npgsql (authz catalog db) + the OpenFGA client
+  MsAuthz.Infrastructure/   Catalog file loader + the OpenFGA client
   Authz.Client/             NuGet SDK for .NET consumers
 tests/
-  MsAuthz.UnitTests/        Identifiers, tenant filtering, idempotent materialization
+  MsAuthz.UnitTests/        Identifiers, tenant filtering, idempotent materialization, catalog loading
   Authz.Client.UnitTests/   Attribute/extension + pipeline-behavior tests
-liquibase/                  This repo's own migrations for the `authz` database
+docs/                       MS-AUTHZ-SPEC.md and the example catalog file
 docker/                     Dockerfile lives in src/MsAuthz.Api; compose fragment lives here
 ```
 
@@ -198,8 +201,9 @@ dotnet test MsAuthz.slnx
 ```
 
 Both run with **no external dependencies** — no Postgres, no OpenFGA. `MsAuthz.Infrastructure`'s
-`OpenFgaGateway` and EF repositories are never exercised directly in tests; instead, the Application
-layer's services are tested against in-memory fakes of `IOpenFgaGateway`, `ICatalogRepository` and
-`ITenantRegistry` (`tests/MsAuthz.UnitTests/TestDoubles/`). This is deliberate: the interfaces those
-services depend on are the actual contract worth testing at this layer, and it keeps the whole suite
-runnable offline.
+`OpenFgaGateway` is never exercised directly in tests; instead, the Application layer's services are
+tested against in-memory fakes of `IOpenFgaGateway` and `ICatalogRepository`
+(`tests/MsAuthz.UnitTests/TestDoubles/`). This is deliberate: the interfaces those services depend on
+are the actual contract worth testing at this layer, and it keeps the whole suite runnable offline.
+`CatalogFileLoader` itself — the one piece of Infrastructure with real logic worth testing directly —
+is covered against real temp files in `tests/MsAuthz.UnitTests/Catalog/`.

@@ -237,6 +237,8 @@ role_permissions   (role_id, permission_id)
 tenants            (id, code)                      -- ver nota
 ```
 
+*(→ ver §15: este schema quedó reemplazado por un archivo JSON — ms-authz ya no tiene base propia.)*
+
 **Nota sobre `tenants`:** no estaba en el diseño original y se agregó al implementar. `POST /catalog/sync`
 tiene que iterar sobre todos los tenants para re-expandir el catálogo, y esa lista tiene que vivir en
 algún lado durable — OpenFGA no la puede enumerar, porque el tenant es solo un prefijo de string dentro
@@ -278,7 +280,7 @@ Postgres :5432  (una instancia, un backup, un compose)
 ├── keycloak          keycloak_user      ← migra Keycloak          (ya existe)
 ├── estudio-contable  api/migration_user ← migra Liquibase         (ya existe)
 ├── openfga           openfga_user       ← migra `openfga migrate`     NUEVO
-└── authz             authz_user         ← migra Liquibase             NUEVO
+└── authz             authz_user         ← migra Liquibase             NUEVO (→ ver §15: eliminada)
 ```
 
 **OpenFGA necesita base propia, no es preferencia:** migra su esquema con su propia herramienta
@@ -527,3 +529,29 @@ OpenFGA falla. `ms-authz/scripts/bootstrap-openfga.sh` lo resuelve y está proba
 - Quién tiene acceso directo a la API/CLI de OpenFGA para debugging, vs. todo pasa siempre por
   `ms-authz` en operación normal. Recomendado: acceso directo solo para ops/debug.
 - Disciplina de migración de modelos cuando aparezca ReBAC (§3). No bloqueante para v1.
+
+## 15. Revisión 2026-09-04: ms-authz sin persistencia propia
+
+**Qué cambió.** El catálogo (roles, permisos, rol→permiso, nombres, descripciones — §5) ya no vive en
+un Postgres propio migrado con Liquibase: se lee de un archivo JSON (`Catalog:Path`) una sola vez al
+arrancar, validado y expandido en memoria. `ms-authz` ya no tiene base `authz` ni base propia de
+ningún tipo — OpenFGA es la única persistencia que le queda. La tabla `tenants` (§5, nota) también
+desaparece: `ms-authz` no guarda una lista de tenants provisionados. `POST /catalog/sync` recibe la
+lista de tenants a re-expandir directamente en el body (`{ "tenantCodes": [...] }`) en vez de
+iterarla desde su propio registro.
+
+**Por qué.** El tenant es del sistema consumidor, no de `ms-authz` — mantener una segunda lista acá
+(la tabla `tenants`) corre el riesgo de desalinearse con la fuente real (`public.tenants` del
+consumidor, o el listado de realms de Keycloak), sin aportar nada que el consumidor no supiera ya.
+Un contenedor sin base propia es más fácil de reusar en un sistema nuevo: no hay Postgres que
+aprovisionar ni Liquibase que correr antes del primer request, solo un archivo. Y el catálogo nunca
+necesitó ser una base relacional: es "fijo por deploy" (§5, v1) — la razón original para tener
+`roles`/`permissions`/`role_permissions` en Postgres era que OpenFGA no admite metadata (nombres,
+descripciones, agrupación) en sus propios objetos, no que hiciera falta una base transaccional. Un
+archivo cumple exactamente ese rol.
+
+**Qué queda igual.** El modelo DSL (§3), los identificadores y el separador `|` (§4), la
+materialización por tenant (§5), el filtro obligatorio contra el cruce entre tenants de `ListObjects`
+y `Read` parcial (§4), y el SDK `Authz.Client` (§8) — que ahora además expone `ProvisionTenantAsync` y
+`SyncCatalogAsync` en `IAuthzAdminClient`, ya que sin `ITenantRegistry` es el consumidor quien decide
+qué tenants sincronizar.
