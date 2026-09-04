@@ -23,8 +23,6 @@ public static class DependencyInjection
             AuthorizationModelId = openFgaSettings.AuthorizationModelId,
         }));
 
-        // Lazy so a test host can RemoveAll<ICatalogRepository>() and replace it with a fake without
-        // this factory ever running — Load() would otherwise fail for a path that doesn't exist.
         services.AddSingleton<ICatalogRepository>(_ =>
             new FileCatalogRepository(CatalogFileLoader.Load(ResolveCatalogPath(catalogSettings.Path))));
 
