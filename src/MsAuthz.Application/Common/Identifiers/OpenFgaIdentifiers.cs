@@ -26,6 +26,14 @@ public static class OpenFgaIdentifiers
     public static void EnsureValidTenantCode(string tenantCode)
         => EnsureValidComponent(tenantCode, nameof(tenantCode));
 
+    /// <summary>
+    /// Public entry point for validating a catalog role/permission code against the same rules as
+    /// every other identifier component here — used when loading the catalog file so it can't
+    /// smuggle in a code that would later produce a malformed OpenFGA object.
+    /// </summary>
+    public static void EnsureValidCode(string value, string paramName)
+        => EnsureValidComponent(value, paramName);
+
     /// <summary>Builds the "user:&lt;id&gt;" object for a Keycloak user id.</summary>
     public static string User(string keycloakUserId)
     {

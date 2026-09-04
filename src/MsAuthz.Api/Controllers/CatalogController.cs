@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using MsAuthz.Api.Contracts;
 using MsAuthz.Application.Services;
 
 namespace MsAuthz.Api.Controllers;
@@ -8,11 +9,15 @@ namespace MsAuthz.Api.Controllers;
 [Route("catalog")]
 public class CatalogController(ICatalogSyncService catalogSyncService) : ControllerBase
 {
-    /// <summary>Idempotent — re-expands the current catalog into tuples for every known tenant.</summary>
+    /// <summary>Idempotent — re-expands the current catalog into tuples for every tenant code given.</summary>
     [HttpPost("sync")]
-    public async Task<ActionResult<IReadOnlyList<string>>> Sync(CancellationToken cancellationToken)
+    public async Task<ActionResult<IReadOnlyList<string>>> Sync(
+        [FromBody] SyncCatalogRequest request, CancellationToken cancellationToken)
     {
-        var syncedTenants = await catalogSyncService.SyncAllTenantsAsync(cancellationToken);
+        if (request.TenantCodes is not { Count: > 0 })
+            return BadRequest("'tenantCodes' is required.");
+
+        var syncedTenants = await catalogSyncService.SyncTenantsAsync(request.TenantCodes, cancellationToken);
         return Ok(syncedTenants);
     }
 }

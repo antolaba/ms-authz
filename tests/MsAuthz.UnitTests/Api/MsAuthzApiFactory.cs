@@ -19,7 +19,7 @@ public class MsAuthzApiFactory : WebApplicationFactory<Program>
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Security:ApiKey"] = ApiKey,
-                ["Database:ConnectionString"] = "Host=localhost;Database=unused",
+                ["Catalog:Path"] = "unused.json",
                 ["OpenFga:ApiUrl"] = "http://localhost",
                 ["OpenFga:StoreId"] = "unused",
             });
@@ -32,9 +32,6 @@ public class MsAuthzApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<ICatalogRepository>();
             services.AddSingleton<ICatalogRepository>(new FakeCatalogRepository());
-
-            services.RemoveAll<ITenantRegistry>();
-            services.AddSingleton<ITenantRegistry>(new FakeTenantRegistry());
         });
     }
 }

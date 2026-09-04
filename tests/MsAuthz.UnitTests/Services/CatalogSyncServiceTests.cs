@@ -1,4 +1,5 @@
 using FluentAssertions;
+using MsAuthz.Application.Common.Exceptions;
 using MsAuthz.Application.Common.Identifiers;
 using MsAuthz.Application.Services;
 using MsAuthz.UnitTests.TestDoubles;
@@ -8,38 +9,35 @@ namespace MsAuthz.UnitTests.Services;
 public class CatalogSyncServiceTests
 {
     [Fact]
-    public async Task SyncAllTenantsAsync_reexpands_the_catalog_for_every_known_tenant()
+    public async Task SyncTenantsAsync_reexpands_the_catalog_for_every_tenant_given()
     {
         var catalog = new FakeCatalogRepository().WithRole("vendedor", "Vendedor", "Sales.Read");
-        var registry = new FakeTenantRegistry();
         var gateway = new FakeOpenFgaGateway();
-        var provisioning = new TenantProvisioningService(catalog, registry, gateway, TestLogger.For<TenantProvisioningService>());
+        var provisioning = new TenantProvisioningService(catalog, gateway, TestLogger.For<TenantProvisioningService>());
+        var sut = new CatalogSyncService(provisioning, TestLogger.For<CatalogSyncService>());
 
-        await provisioning.ProvisionTenantAsync("jurol");
-        await provisioning.ProvisionTenantAsync("otraempresa");
-
-        var sut = new CatalogSyncService(registry, provisioning, TestLogger.For<CatalogSyncService>());
-        var syncedTenants = await sut.SyncAllTenantsAsync();
+        var syncedTenants = await sut.SyncTenantsAsync(["jurol", "otraempresa"]);
 
         syncedTenants.Should().BeEquivalentTo(["jurol", "otraempresa"]);
+        gateway.Tuples.Should().Contain((
+            OpenFgaIdentifiers.RoleAssigneeUserset("jurol", "vendedor"),
+            OpenFgaIdentifiers.GrantedRelation,
+            OpenFgaIdentifiers.Permission("jurol", "Sales.Read")));
+        gateway.Tuples.Should().Contain((
+            OpenFgaIdentifiers.RoleAssigneeUserset("otraempresa", "vendedor"),
+            OpenFgaIdentifiers.GrantedRelation,
+            OpenFgaIdentifiers.Permission("otraempresa", "Sales.Read")));
     }
 
     [Fact]
-    public async Task SyncAllTenantsAsync_picks_up_a_new_permission_added_to_the_catalog_after_provisioning()
+    public async Task SyncTenantsAsync_picks_up_a_new_permission_added_to_the_catalog()
     {
-        var catalog = new FakeCatalogRepository().WithRole("vendedor", "Vendedor", "Sales.Read");
-        var registry = new FakeTenantRegistry();
-        var gateway = new FakeOpenFgaGateway();
-        var provisioning = new TenantProvisioningService(catalog, registry, gateway, TestLogger.For<TenantProvisioningService>());
-        await provisioning.ProvisionTenantAsync("jurol");
-
-        // Simulate a catalog change: "vendedor" now also grants "Sales.Write".
         var updatedCatalog = new FakeCatalogRepository().WithRole("vendedor", "Vendedor", "Sales.Read", "Sales.Write");
-        var provisioningWithUpdatedCatalog = new TenantProvisioningService(
-            updatedCatalog, registry, gateway, TestLogger.For<TenantProvisioningService>());
-        var sut = new CatalogSyncService(registry, provisioningWithUpdatedCatalog, TestLogger.For<CatalogSyncService>());
+        var gateway = new FakeOpenFgaGateway();
+        var provisioning = new TenantProvisioningService(updatedCatalog, gateway, TestLogger.For<TenantProvisioningService>());
+        var sut = new CatalogSyncService(provisioning, TestLogger.For<CatalogSyncService>());
 
-        await sut.SyncAllTenantsAsync();
+        await sut.SyncTenantsAsync(["jurol"]);
 
         gateway.Tuples.Should().Contain((
             OpenFgaIdentifiers.RoleAssigneeUserset("jurol", "vendedor"),
@@ -48,35 +46,45 @@ public class CatalogSyncServiceTests
     }
 
     [Fact]
-    public async Task SyncAllTenantsAsync_is_idempotent()
+    public async Task SyncTenantsAsync_is_idempotent()
     {
         var catalog = new FakeCatalogRepository().WithRole("vendedor", "Vendedor", "Sales.Read");
-        var registry = new FakeTenantRegistry();
         var gateway = new FakeOpenFgaGateway();
-        var provisioning = new TenantProvisioningService(catalog, registry, gateway, TestLogger.For<TenantProvisioningService>());
-        await provisioning.ProvisionTenantAsync("jurol");
+        var provisioning = new TenantProvisioningService(catalog, gateway, TestLogger.For<TenantProvisioningService>());
+        var sut = new CatalogSyncService(provisioning, TestLogger.For<CatalogSyncService>());
 
-        var sut = new CatalogSyncService(registry, provisioning, TestLogger.For<CatalogSyncService>());
-
-        await sut.SyncAllTenantsAsync();
+        await sut.SyncTenantsAsync(["jurol"]);
         var countAfterFirstSync = gateway.Tuples.Count;
-        await sut.SyncAllTenantsAsync();
+        await sut.SyncTenantsAsync(["jurol"]);
 
         gateway.Tuples.Should().HaveCount(countAfterFirstSync);
     }
 
     [Fact]
-    public async Task SyncAllTenantsAsync_with_no_registered_tenants_does_nothing()
+    public async Task SyncTenantsAsync_rejects_an_empty_tenant_list()
     {
         var catalog = new FakeCatalogRepository().WithRole("vendedor", "Vendedor", "Sales.Read");
-        var registry = new FakeTenantRegistry();
         var gateway = new FakeOpenFgaGateway();
-        var provisioning = new TenantProvisioningService(catalog, registry, gateway, TestLogger.For<TenantProvisioningService>());
-        var sut = new CatalogSyncService(registry, provisioning, TestLogger.For<CatalogSyncService>());
+        var provisioning = new TenantProvisioningService(catalog, gateway, TestLogger.For<TenantProvisioningService>());
+        var sut = new CatalogSyncService(provisioning, TestLogger.For<CatalogSyncService>());
 
-        var syncedTenants = await sut.SyncAllTenantsAsync();
+        var act = () => sut.SyncTenantsAsync([]);
 
-        syncedTenants.Should().BeEmpty();
+        await act.Should().ThrowAsync<InvalidCatalogRequestException>();
         gateway.Tuples.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SyncTenantsAsync_rejects_an_invalid_tenant_code_before_touching_any_tenant()
+    {
+        var catalog = new FakeCatalogRepository().WithRole("vendedor", "Vendedor", "Sales.Read");
+        var gateway = new FakeOpenFgaGateway();
+        var provisioning = new TenantProvisioningService(catalog, gateway, TestLogger.For<TenantProvisioningService>());
+        var sut = new CatalogSyncService(provisioning, TestLogger.For<CatalogSyncService>());
+
+        var act = () => sut.SyncTenantsAsync(["jurol", "bad|code"]);
+
+        await act.Should().ThrowAsync<ArgumentException>();
+        gateway.Tuples.Should().BeEmpty("jurol must not be provisioned once a later code in the same request is invalid");
     }
 }

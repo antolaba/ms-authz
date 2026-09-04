@@ -1,0 +1,32 @@
+{
+  "permissions": [
+    { "code": "Sales.Read", "module": "Sales", "description": "View sales" },
+    { "code": "Sales.Write", "module": "Sales", "description": "Create and edit sales" },
+    { "code": "Sales.Void", "module": "Sales", "description": "Void an already issued sale" },
+    { "code": "Inventory.Read", "module": "Inventory", "description": "View stock and movements" },
+    { "code": "Inventory.Write", "module": "Inventory", "description": "Record stock movements" },
+    { "code": "Inventory.Adjust", "module": "Inventory", "description": "Adjust stock without a supporting document" },
+    { "code": "Iam.Read", "module": "Iam", "description": "View users and their assigned roles" },
+    { "code": "Iam.ManageRoles", "module": "Iam", "description": "Assign and remove roles from users" }
+  ],
+  "roles": [
+    {
+      "code": "admin",
+      "name": "Administrator",
+      "description": "Full access, including role administration",
+      "permissions": ["*"]
+    },
+    {
+      "code": "seller",
+      "name": "Seller",
+      "description": null,
+      "permissions": ["Sales.Read", "Sales.Write", "Inventory.Read"]
+    },
+    {
+      "code": "warehouse",
+      "name": "Warehouse",
+      "description": "Inventory: stock, receipts and adjustments",
+      "permissions": ["Inventory.Read", "Inventory.Write", "Inventory.Adjust"]
+    }
+  ]
+}

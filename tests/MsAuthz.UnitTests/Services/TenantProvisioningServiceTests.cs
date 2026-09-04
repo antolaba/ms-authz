@@ -17,9 +17,8 @@ public class TenantProvisioningServiceTests
         var catalog = new FakeCatalogRepository()
             .WithRole("vendedor", "Vendedor", "Sales.Read", "Sales.Write")
             .WithRole("cajero", "Cajero", "Cashier.Open");
-        var registry = new FakeTenantRegistry();
         var gateway = new FakeOpenFgaGateway();
-        var sut = new TenantProvisioningService(catalog, registry, gateway, TestLogger.For<TenantProvisioningService>());
+        var sut = new TenantProvisioningService(catalog, gateway, TestLogger.For<TenantProvisioningService>());
 
         await sut.ProvisionTenantAsync("jurol");
 
@@ -39,26 +38,12 @@ public class TenantProvisioningServiceTests
     }
 
     [Fact]
-    public async Task ProvisionTenantAsync_registers_the_tenant_so_catalog_sync_can_find_it_later()
-    {
-        var catalog = new FakeCatalogRepository().WithRole("vendedor", "Vendedor", "Sales.Read");
-        var registry = new FakeTenantRegistry();
-        var gateway = new FakeOpenFgaGateway();
-        var sut = new TenantProvisioningService(catalog, registry, gateway, TestLogger.For<TenantProvisioningService>());
-
-        await sut.ProvisionTenantAsync("jurol");
-
-        (await registry.GetAllTenantCodesAsync()).Should().ContainSingle().Which.Should().Be("jurol");
-    }
-
-    [Fact]
     public async Task ProvisionTenantAsync_is_idempotent_when_called_twice_for_the_same_tenant()
     {
         var catalog = new FakeCatalogRepository()
             .WithRole("vendedor", "Vendedor", "Sales.Read", "Sales.Write");
-        var registry = new FakeTenantRegistry();
         var gateway = new FakeOpenFgaGateway();
-        var sut = new TenantProvisioningService(catalog, registry, gateway, TestLogger.For<TenantProvisioningService>());
+        var sut = new TenantProvisioningService(catalog, gateway, TestLogger.For<TenantProvisioningService>());
 
         await sut.ProvisionTenantAsync("jurol");
         var tupleCountAfterFirstRun = gateway.Tuples.Count;
@@ -66,16 +51,14 @@ public class TenantProvisioningServiceTests
         await sut.ProvisionTenantAsync("jurol");
 
         gateway.Tuples.Should().HaveCount(tupleCountAfterFirstRun, "re-running provisioning must not duplicate tuples");
-        (await registry.GetAllTenantCodesAsync()).Should().ContainSingle("tenant registration must also be idempotent");
     }
 
     [Fact]
     public async Task ProvisionTenantAsync_does_not_touch_tuples_already_materialized_for_another_tenant()
     {
         var catalog = new FakeCatalogRepository().WithRole("vendedor", "Vendedor", "Sales.Read");
-        var registry = new FakeTenantRegistry();
         var gateway = new FakeOpenFgaGateway();
-        var sut = new TenantProvisioningService(catalog, registry, gateway, TestLogger.For<TenantProvisioningService>());
+        var sut = new TenantProvisioningService(catalog, gateway, TestLogger.For<TenantProvisioningService>());
 
         await sut.ProvisionTenantAsync("jurol");
         await sut.ProvisionTenantAsync("otraempresa");
@@ -94,15 +77,14 @@ public class TenantProvisioningServiceTests
     [Fact]
     public async Task ProvisionTenantAsync_revokes_a_permission_the_catalog_no_longer_grants_a_role()
     {
-        var registry = new FakeTenantRegistry();
         var gateway = new FakeOpenFgaGateway();
 
         var catalogBefore = new FakeCatalogRepository().WithRole("vendedor", "Vendedor", "Sales.Read", "Sales.Write");
-        var sutBefore = new TenantProvisioningService(catalogBefore, registry, gateway, TestLogger.For<TenantProvisioningService>());
+        var sutBefore = new TenantProvisioningService(catalogBefore, gateway, TestLogger.For<TenantProvisioningService>());
         await sutBefore.ProvisionTenantAsync("jurol");
 
         var catalogAfter = new FakeCatalogRepository().WithRole("vendedor", "Vendedor", "Sales.Read");
-        var sutAfter = new TenantProvisioningService(catalogAfter, registry, gateway, TestLogger.For<TenantProvisioningService>());
+        var sutAfter = new TenantProvisioningService(catalogAfter, gateway, TestLogger.For<TenantProvisioningService>());
         await sutAfter.ProvisionTenantAsync("jurol");
 
         gateway.Tuples.Should().Contain((
@@ -118,16 +100,15 @@ public class TenantProvisioningServiceTests
     [Fact]
     public async Task ProvisionTenantAsync_revoking_a_permission_in_one_tenant_does_not_touch_another_tenant()
     {
-        var registry = new FakeTenantRegistry();
         var gateway = new FakeOpenFgaGateway();
 
         var catalogBefore = new FakeCatalogRepository().WithRole("vendedor", "Vendedor", "Sales.Read", "Sales.Write");
-        var sutBefore = new TenantProvisioningService(catalogBefore, registry, gateway, TestLogger.For<TenantProvisioningService>());
+        var sutBefore = new TenantProvisioningService(catalogBefore, gateway, TestLogger.For<TenantProvisioningService>());
         await sutBefore.ProvisionTenantAsync("jurol");
         await sutBefore.ProvisionTenantAsync("otraempresa");
 
         var catalogAfter = new FakeCatalogRepository().WithRole("vendedor", "Vendedor", "Sales.Read");
-        var sutAfter = new TenantProvisioningService(catalogAfter, registry, gateway, TestLogger.For<TenantProvisioningService>());
+        var sutAfter = new TenantProvisioningService(catalogAfter, gateway, TestLogger.For<TenantProvisioningService>());
         await sutAfter.ProvisionTenantAsync("jurol");
 
         gateway.Tuples.Should().NotContain((
@@ -147,18 +128,15 @@ public class TenantProvisioningServiceTests
     [InlineData("acme:prod")]
     [InlineData("acme corp")]
     [InlineData("")]
-    public async Task ProvisionTenantAsync_rejects_an_invalid_tenant_code_without_registering_it(string invalidTenantCode)
+    public async Task ProvisionTenantAsync_rejects_an_invalid_tenant_code_without_writing_any_tuple(string invalidTenantCode)
     {
         var catalog = new FakeCatalogRepository().WithRole("vendedor", "Vendedor", "Sales.Read");
-        var registry = new FakeTenantRegistry();
         var gateway = new FakeOpenFgaGateway();
-        var sut = new TenantProvisioningService(catalog, registry, gateway, TestLogger.For<TenantProvisioningService>());
+        var sut = new TenantProvisioningService(catalog, gateway, TestLogger.For<TenantProvisioningService>());
 
         var act = () => sut.ProvisionTenantAsync(invalidTenantCode);
 
         await act.Should().ThrowAsync<ArgumentException>();
-        (await registry.GetAllTenantCodesAsync()).Should().BeEmpty(
-            "an invalid tenant code must never be persisted — it would break every future catalog/sync run");
         gateway.Tuples.Should().BeEmpty();
     }
 }

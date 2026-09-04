@@ -4,6 +4,7 @@ using Microsoft.OpenApi.Models;
 using MsAuthz.Api.Authentication;
 using MsAuthz.Api.Extensions;
 using MsAuthz.Application;
+using MsAuthz.Application.Interfaces;
 using MsAuthz.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -62,6 +63,10 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+// Force the catalog file to load now, not on the first request — an invalid or missing catalog
+// must fail the process at startup (MS-AUTHZ-SPEC.md §5), not surface as a 500 on the first call.
+app.Services.GetRequiredService<ICatalogRepository>();
 
 app.UseExceptionHandler();
 

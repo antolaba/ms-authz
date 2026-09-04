@@ -6,7 +6,6 @@ namespace MsAuthz.Application.Services;
 
 public class TenantProvisioningService(
     ICatalogRepository catalogRepository,
-    ITenantRegistry tenantRegistry,
     IOpenFgaGateway openFgaGateway,
     ILogger<TenantProvisioningService> logger) : ITenantProvisioningService
 {
@@ -24,9 +23,6 @@ public class TenantProvisioningService(
                 "Rejected tenant provisioning for tenant code {TenantCode}: {Reason}", tenantCode, ex.Message);
             throw;
         }
-
-        // Idempotent: RegisterAsync is a no-op for a tenant code already known.
-        await tenantRegistry.RegisterAsync(tenantCode, cancellationToken);
 
         var roles = await catalogRepository.GetRolesAsync(cancellationToken);
 

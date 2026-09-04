@@ -1,11 +1,9 @@
 using System.ComponentModel.DataAnnotations;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MsAuthz.Application.Interfaces;
+using MsAuthz.Infrastructure.Catalog;
 using MsAuthz.Infrastructure.OpenFga;
-using MsAuthz.Infrastructure.Persistence;
-using MsAuthz.Infrastructure.Persistence.Repositories;
 using MsAuthz.Infrastructure.Settings;
 using OpenFga.Sdk.Client;
 
@@ -15,11 +13,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var databaseSettings = BindAndValidate<DatabaseSettings>(configuration, DatabaseSettings.SectionName);
+        var catalogSettings = BindAndValidate<CatalogSettings>(configuration, CatalogSettings.SectionName);
         var openFgaSettings = BindAndValidate<OpenFgaSettings>(configuration, OpenFgaSettings.SectionName);
-
-        services.AddDbContext<AuthzDbContext>(options =>
-            options.UseNpgsql(databaseSettings.ConnectionString));
 
         services.AddSingleton(_ => new OpenFgaClient(new ClientConfiguration
         {
@@ -28,12 +23,18 @@ public static class DependencyInjection
             AuthorizationModelId = openFgaSettings.AuthorizationModelId,
         }));
 
-        services.AddScoped<ICatalogRepository, CatalogRepository>();
-        services.AddScoped<ITenantRegistry, TenantRegistry>();
+        // Lazy so a test host can RemoveAll<ICatalogRepository>() and replace it with a fake without
+        // this factory ever running — Load() would otherwise fail for a path that doesn't exist.
+        services.AddSingleton<ICatalogRepository>(_ =>
+            new FileCatalogRepository(CatalogFileLoader.Load(ResolveCatalogPath(catalogSettings.Path))));
+
         services.AddScoped<IOpenFgaGateway, OpenFgaGateway>();
 
         return services;
     }
+
+    private static string ResolveCatalogPath(string path)
+        => System.IO.Path.IsPathRooted(path) ? path : System.IO.Path.Combine(Directory.GetCurrentDirectory(), path);
 
     private static T BindAndValidate<T>(IConfiguration configuration, string sectionName) where T : IValidatableObject, new()
     {
