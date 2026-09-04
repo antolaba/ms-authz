@@ -4,7 +4,7 @@ Authorization component over OpenFGA. Standalone repo, own git history, part of 
 workspace but consumed by any number of unrelated systems (MS-AUTHZ-SPEC.md §2 — nothing is shared
 between systems except this repo's code, the `Authz.Client` package, and the OpenFGA model file).
 
-**Read `MS-AUTHZ-SPEC.md` first** (workspace root, one level above this repo). It is the contract —
+**Read `docs/MS-AUTHZ-SPEC.md` first**. It is the contract —
 identifiers, the catalog/materialization model, the API shape, the security boundary. This file only
 covers house style for writing code here.
 
@@ -131,3 +131,6 @@ imperative mood, no trailing period. The body explains **why** — the diff alre
 Note this differs from `estudio-contable`, whose repos use Spanish subjects by team convention. This
 repo is a standalone reusable component, not part of that workspace, so it follows the default
 English convention instead.
+
+**No AI attribution.** Never add `Co-Authored-By`, "Generated with", or any other assistant
+attribution line to commit messages or PR descriptions. The author is the person committing.

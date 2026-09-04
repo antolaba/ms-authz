@@ -3,7 +3,7 @@
 Authorization component over [OpenFGA](https://openfga.dev/). Each system that needs authorization
 runs its **own** instance of ms-authz + OpenFGA + two Postgres databases — nothing is shared between
 systems except this repo's code, the `Authz.Client` NuGet package, and the OpenFGA model file. Full
-design rationale lives in `MS-AUTHZ-SPEC.md` (in the workspace root, one level up from this repo).
+design rationale lives in `docs/MS-AUTHZ-SPEC.md`.
 
 ## ⚠️ Security boundary — read this before deploying anything
 
