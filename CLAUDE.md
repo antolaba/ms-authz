@@ -71,7 +71,7 @@ plain add, so the service genuinely needs to know what's currently there in orde
 remove.
 - `UserRoleService.SetUserRolesAsync` — `PUT /users/{id}/roles` replaces a user's whole role set.
 - `TenantProvisioningService.ProvisionTenantAsync` — a role's permission set in the catalog is the
-  source of truth, so re-provisioning a tenant (including via `POST /catalog/sync`) must revoke a
+  source of truth, so re-syncing a tenant via `POST /catalog/sync` must revoke a
   permission the catalog no longer grants a role, not just add newly-granted ones. It diffs per role
   via `IOpenFgaGateway.ReadObjectsForUserAsync` against the role's assignee userset.
 

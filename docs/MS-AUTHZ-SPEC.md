@@ -322,7 +322,7 @@ Repo nuevo. Chico: no reimplementa evaluación de permisos, eso lo hace OpenFGA.
 | `GET /me/permissions` | Lista plana de códigos para el tenant y usuario dados. Lo consume el SDK. |
 | `GET /roles` | Catálogo legible, para pintar la pantalla de administración. |
 | `GET /users/{id}/roles` · `PUT` | Asignación de roles a un usuario en un tenant. |
-| `POST /tenants` | Provisioning: expande el catálogo a tuplas para el tenant nuevo. |
+| `POST /tenants` | Provisioning: expande el catálogo a tuplas para el tenant nuevo. → ver §15: absorbido por `POST /catalog/sync`. |
 | `POST /catalog/sync` | Job idempotente de re-expansión tras un cambio de catálogo. |
 
 ### Frontera de seguridad
@@ -552,6 +552,9 @@ archivo cumple exactamente ese rol.
 
 **Qué queda igual.** El modelo DSL (§3), los identificadores y el separador `|` (§4), la
 materialización por tenant (§5), el filtro obligatorio contra el cruce entre tenants de `ListObjects`
-y `Read` parcial (§4), y el SDK `Authz.Client` (§8) — que ahora además expone `ProvisionTenantAsync` y
-`SyncCatalogAsync` en `IAuthzAdminClient`, ya que sin `ITenantRegistry` es el consumidor quien decide
-qué tenants sincronizar.
+y `Read` parcial (§4), y el SDK `Authz.Client` (§8) — que ahora además expone `SyncCatalogAsync` en
+`IAuthzAdminClient`, ya que sin `ITenantRegistry` es el consumidor quien decide qué tenants sincronizar.
+
+**Un solo endpoint de materialización.** `POST /tenants` (§7) desaparece: dar de alta un tenant y
+re-expandir el catálogo eran la misma operación con dos puertas. Queda sólo `POST /catalog/sync` con la
+lista de tenants; el alta de un tenant es un sync de uno.

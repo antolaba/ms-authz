@@ -64,15 +64,8 @@ OpenFga__StoreId / OpenFga__AuthorizationModelId environment variables):
     "AuthorizationModelId": "$MODEL_ID"
   }
 
-Next: mount the catalog file (Catalog__Path) and register each tenant so the
-catalog is materialised into tuples, either one at a time:
-
-  curl -X POST http://localhost:6010/tenants \\
-    -H "X-Api-Key: \$MS_AUTHZ_API_KEY" \\
-    -H "Content-Type: application/json" \\
-    -d '{"tenantCode":"<tenant code>"}'
-
-or all at once, if every tenant code is already known:
+Next: mount the catalog file (Catalog__Path) and sync every tenant so the
+catalog is materialised into tuples:
 
   curl -X POST http://localhost:6010/catalog/sync \\
     -H "X-Api-Key: \$MS_AUTHZ_API_KEY" \\

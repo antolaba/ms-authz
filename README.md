@@ -64,8 +64,7 @@ permissions between companies.
 | `GET /roles` | Readable catalog (roles + the permission codes each carries). |
 | `GET /users/{id}/roles?tenant=` | Roles currently assigned to a user in a tenant. |
 | `PUT /users/{id}/roles?tenant=` | Replaces the user's role set in that tenant. Body: `{ "roleCodes": [...] }`. |
-| `POST /tenants` | Provisioning: expands the whole catalog into tuples for a new tenant. Body: `{ "tenantCode": "jurol" }`. Idempotent. |
-| `POST /catalog/sync` | Re-expands the catalog for the given tenants — run after a catalog change. Body: `{ "tenantCodes": ["jurol", "..."] }`. ms-authz has no list of tenants of its own, so the caller supplies it. Idempotent. |
+| `POST /catalog/sync` | Expands the catalog into tuples for the given tenants. Call it when a tenant is created and again after any catalog change. Body: `{ "tenantCodes": ["jurol", "..."] }`. ms-authz has no list of tenants of its own, so the caller supplies it. Idempotent. |
 | `GET /health` | Liveness, no API key required. |
 
 ## Running locally
@@ -172,8 +171,8 @@ same 403.
 ### `IAuthzAdminClient`
 
 Uncached administration operations, registered separately via `AddAuthzAdminClient`: reading the
-role catalog, reading/replacing a user's roles, `ProvisionTenantAsync(tenantCode)`, and
-`SyncCatalogAsync(tenantCodes)` — the client-side calls for `POST /tenants` and `POST /catalog/sync`.
+role catalog, reading/replacing a user's roles, and `SyncCatalogAsync(tenantCodes)` — the
+client-side call for `POST /catalog/sync`.
 
 ## Repository layout
 

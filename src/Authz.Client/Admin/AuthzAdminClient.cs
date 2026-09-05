@@ -65,23 +65,6 @@ public class AuthzAdminClient(HttpClient httpClient, ILogger<AuthzAdminClient> l
         return roles ?? [];
     }
 
-    public async Task ProvisionTenantAsync(string tenantCode, CancellationToken cancellationToken = default)
-    {
-        logger.LogDebug("Provisioning tenant {TenantCode} in ms-authz", tenantCode);
-
-        var response = await httpClient.PostAsJsonAsync(
-            "tenants", new { tenantCode }, JsonOptions, cancellationToken);
-
-        if (response.StatusCode == HttpStatusCode.BadRequest)
-        {
-            var detail = await TryReadProblemDetailAsync(response, cancellationToken);
-            logger.LogWarning("ms-authz rejected provisioning tenant {TenantCode}: {Detail}", tenantCode, detail);
-            throw new AuthzInvalidRequestException(detail ?? "Invalid tenant code.");
-        }
-
-        response.EnsureSuccessStatusCode();
-    }
-
     public async Task<IReadOnlyList<string>> SyncCatalogAsync(
         IReadOnlyList<string> tenantCodes, CancellationToken cancellationToken = default)
     {

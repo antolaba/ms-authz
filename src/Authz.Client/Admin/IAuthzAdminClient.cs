@@ -33,15 +33,9 @@ public interface IAuthzAdminClient
         string tenantCode, string userId, IReadOnlyList<string> roleCodes, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Expands the whole catalog into OpenFGA tuples for a new tenant. Idempotent. Throws
-    /// <see cref="Exceptions.AuthzInvalidRequestException"/> for an invalid tenant code.
-    /// </summary>
-    Task ProvisionTenantAsync(string tenantCode, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Re-expands the current catalog into tuples for every tenant code given — run after a
-    /// role/permission change. Idempotent. Throws <see cref="Exceptions.AuthzInvalidRequestException"/>
-    /// for an empty list or an invalid tenant code.
+    /// Expands the current catalog into tuples for every tenant code given — both for a newly created
+    /// tenant and after a role/permission change. Idempotent. Throws
+    /// <see cref="Exceptions.AuthzInvalidRequestException"/> for an empty list or an invalid tenant code.
     /// </summary>
     Task<IReadOnlyList<string>> SyncCatalogAsync(
         IReadOnlyList<string> tenantCodes, CancellationToken cancellationToken = default);

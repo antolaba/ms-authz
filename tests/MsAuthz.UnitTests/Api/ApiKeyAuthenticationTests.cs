@@ -22,7 +22,7 @@ public class ApiKeyAuthenticationTests(MsAuthzApiFactory factory) : IClassFixtur
     {
         var client = factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/tenants", new { tenantCode = "jurol" });
+        var response = await client.PostAsJsonAsync("/catalog/sync", new { tenantCodes = new[] { "jurol" } });
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -33,7 +33,7 @@ public class ApiKeyAuthenticationTests(MsAuthzApiFactory factory) : IClassFixtur
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ApiKeyAuthenticationDefaults.HeaderName, "wrong-key");
 
-        var response = await client.PostAsJsonAsync("/tenants", new { tenantCode = "jurol" });
+        var response = await client.PostAsJsonAsync("/catalog/sync", new { tenantCodes = new[] { "jurol" } });
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -44,9 +44,9 @@ public class ApiKeyAuthenticationTests(MsAuthzApiFactory factory) : IClassFixtur
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ApiKeyAuthenticationDefaults.HeaderName, MsAuthzApiFactory.ApiKey);
 
-        var response = await client.PostAsJsonAsync("/tenants", new { tenantCode = "jurol" });
+        var response = await client.PostAsJsonAsync("/catalog/sync", new { tenantCodes = new[] { "jurol" } });
 
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public class ApiKeyAuthenticationTests(MsAuthzApiFactory factory) : IClassFixtur
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ApiKeyAuthenticationDefaults.HeaderName, MsAuthzApiFactory.ApiKey);
 
-        var response = await client.PostAsJsonAsync("/tenants", new { tenantCode = "acme|prod" });
+        var response = await client.PostAsJsonAsync("/catalog/sync", new { tenantCodes = new[] { "acme|prod" } });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }

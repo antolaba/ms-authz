@@ -114,38 +114,6 @@ public class AuthzAdminClientTests
     }
 
     [Fact]
-    public async Task ProvisionTenantAsync_PostsTenantCode_AndSucceedsOn204()
-    {
-        // Arrange
-        var handler = new StubHttpMessageHandler(HttpStatusCode.NoContent, null);
-        var client = CreateClient(handler);
-
-        // Act
-        await client.ProvisionTenantAsync("jurol");
-
-        // Assert
-        handler.LastRequest!.Method.Should().Be(HttpMethod.Post);
-        handler.LastRequest.RequestUri!.PathAndQuery.Should().Be("/tenants");
-        handler.LastRequestBody.Should().Be("""{"tenantCode":"jurol"}""");
-    }
-
-    [Fact]
-    public async Task ProvisionTenantAsync_InvalidTenantCode_ThrowsAuthzInvalidRequestExceptionWithProblemDetail()
-    {
-        // Arrange
-        var handler = new StubHttpMessageHandler(HttpStatusCode.BadRequest,
-            """{"status":400,"title":"Invalid request","detail":"Identifier component cannot contain whitespace."}""");
-        var client = CreateClient(handler);
-
-        // Act
-        var act = () => client.ProvisionTenantAsync("acme corp");
-
-        // Assert
-        (await act.Should().ThrowAsync<AuthzInvalidRequestException>())
-            .WithMessage("Identifier component cannot contain whitespace.");
-    }
-
-    [Fact]
     public async Task SyncCatalogAsync_PostsTenantCodes_AndParsesSyncedTenantList()
     {
         // Arrange
