@@ -2,13 +2,14 @@
 
 Este directorio contiene el DSL validado y la suite de tests para el modelo de autorización
 descrito en el §3 de `MS-AUTHZ-SPEC.md`. Validado el 2026-08-27 contra un OpenFGA real
-(`openfga/openfga:v1.19.0`), no solo revisado en papel.
+(`openfga/openfga:v1.19.0`), no solo revisado en papel. Revisado el 2026-09-05 para el subject con
+tenant (`user:<tenant>|<subject>`, §15): la suite se volvió a correr con `fga model test`.
 
 ## Archivos
 
 - `model.fga` — el modelo DSL (schema 1.1), idéntico al del §3 de la spec.
 - `model.fga.yaml` — suite de tests en el formato nativo de `fga model test` (store test):
-  tuplas de ejemplo + 7 casos de test que cubren §12 punto 2.
+  tuplas de ejemplo + 8 casos de test que cubren §12 punto 2 y el §15.
 - `tuples.json` — las mismas tuplas en formato `fga tuple write --file`, usadas para la
   validación manual contra un store HTTP real (evidencia adicional, no solo evaluación local).
 
@@ -28,9 +29,9 @@ Salida esperada:
 
 ```
 # Test Summary #
-Tests 7/7 passing
-Checks 10/10 passing
-ListObjects 1/1 passing
+Tests 8/8 passing
+Checks 12/12 passing
+ListObjects 3/3 passing
 ```
 
 ### Opción completa: contra un servidor OpenFGA real (efímero, aislado)
@@ -49,17 +50,18 @@ fga model write --store-id "$STORE_ID" --file model.fga
 fga tuple write --store-id "$STORE_ID" --file tuples.json
 
 # Checks puntuales, ejemplo:
-fga query check --store-id "$STORE_ID" user:u-vendedor granted permission:jurol\|Sales.Write
+fga query check --store-id "$STORE_ID" user:jurol\|u-vendedor granted permission:jurol\|Sales.Write
 
 # ListObjects (caso 7):
-fga query list-objects --store-id "$STORE_ID" user:u-multitenant granted permission
+fga query list-objects --store-id "$STORE_ID" user:jurol\|u-multitenant granted permission
 
 # al terminar:
 docker rm -f openfga-validate
 ```
 
-Los 7 casos de `model.fga.yaml` fueron corridos ambas formas (local y contra el servidor real)
-el 2026-08-27 y dieron el mismo resultado en las dos. Ver el reporte de la tarea de validación
+Los 7 casos originales de `model.fga.yaml` fueron corridos ambas formas (local y contra el servidor
+real) el 2026-08-27 y dieron el mismo resultado en las dos. La revisión del 2026-09-05 (caso 7
+reescrito, caso 8 nuevo) se corrió en local. Ver el reporte de la tarea de validación
 para la salida completa de cada caso.
 
 ## Qué cubre cada caso (mapeo a §12.2 de la spec)
@@ -72,6 +74,7 @@ para la salida completa de cada caso.
 | 4 | Jerarquía de roles (gerente hereda de vendedor, no al revés) | `true` para lo heredado, `false` para la dirección inversa |
 | 5 | Aislamiento entre tenants | `false` |
 | 6 | Usuario sin roles | `false` |
-| 7 | `ListObjects(user, "granted", "permission")` cruza tenants | **Confirmado**: devuelve permisos de todos los tenants donde el usuario tiene rol — `ms-authz` tiene que filtrar por prefijo `<tenant>\|` del lado del cliente, tal como dice el §4 |
+| 7 | `ListObjects(user:<tenant>\|x, "granted", "permission")` queda acotado al tenant | Devuelve sólo los permisos del tenant que lleva el user. La misma persona en dos tenants son dos objetos user distintos (§15) |
+| 8 | Asignación cruzada malformada (`user:jurol\|x` sobre `role:otraempresa\|admin`) | `ListObjects` **sí** la devuelve: por eso `ms-authz` mantiene el filtro por prefijo `<tenant>\|` como defensa |
 
 El modelo del §3 queda validado tal cual está escrito — no hizo falta ningún cambio de DSL.

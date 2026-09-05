@@ -46,7 +46,7 @@ public class UserRoleService(
                 $"Unknown role code(s): {string.Join(", ", unknownCodes)}");
         }
 
-        var user = OpenFgaIdentifiers.User(userId);
+        var user = OpenFgaIdentifiers.User(tenantCode, userId);
         var currentCodes = await GetAssignedRoleCodesAsync(tenantCode, userId, cancellationToken);
 
         var toAdd = desiredCodes.Except(currentCodes, StringComparer.Ordinal).ToList();
@@ -78,7 +78,7 @@ public class UserRoleService(
     private async Task<List<string>> GetAssignedRoleCodesAsync(
         string tenantCode, string userId, CancellationToken cancellationToken)
     {
-        var user = OpenFgaIdentifiers.User(userId);
+        var user = OpenFgaIdentifiers.User(tenantCode, userId);
         var objects = await openFgaGateway.ReadObjectsForUserAsync(
             user, OpenFgaIdentifiers.AssigneeRelation, OpenFgaIdentifiers.RoleType, cancellationToken);
 

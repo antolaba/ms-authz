@@ -1,18 +1,20 @@
 [
-  { "user": "user:u-vendedor", "relation": "assignee", "object": "role:jurol|vendedor" },
+  { "user": "user:jurol|u-vendedor", "relation": "assignee", "object": "role:jurol|vendedor" },
   { "user": "role:jurol|vendedor#assignee", "relation": "granted", "object": "permission:jurol|Sales.Write" },
   { "user": "role:jurol|vendedor#assignee", "relation": "granted", "object": "permission:jurol|Sales.Read" },
 
-  { "user": "user:u-vendedor-stock", "relation": "assignee", "object": "role:jurol|vendedor" },
-  { "user": "user:u-vendedor-stock", "relation": "assignee", "object": "role:jurol|stock" },
+  { "user": "user:jurol|u-vendedor-stock", "relation": "assignee", "object": "role:jurol|vendedor" },
+  { "user": "user:jurol|u-vendedor-stock", "relation": "assignee", "object": "role:jurol|stock" },
   { "user": "role:jurol|stock#assignee", "relation": "granted", "object": "permission:jurol|Stock.Write" },
 
   { "user": "role:jurol|gerente#assignee", "relation": "assignee", "object": "role:jurol|vendedor" },
-  { "user": "user:u-gerente", "relation": "assignee", "object": "role:jurol|gerente" },
+  { "user": "user:jurol|u-gerente", "relation": "assignee", "object": "role:jurol|gerente" },
 
-  { "user": "user:u-crosstenant", "relation": "assignee", "object": "role:jurol|vendedor" },
+  { "user": "user:jurol|u-crosstenant", "relation": "assignee", "object": "role:jurol|vendedor" },
 
-  { "user": "user:u-multitenant", "relation": "assignee", "object": "role:jurol|vendedor" },
-  { "user": "user:u-multitenant", "relation": "assignee", "object": "role:otraempresa|admin" },
-  { "user": "role:otraempresa|admin#assignee", "relation": "granted", "object": "permission:otraempresa|Purchasing.ApproveOrder" }
+  { "user": "user:jurol|u-multitenant", "relation": "assignee", "object": "role:jurol|vendedor" },
+  { "user": "user:otraempresa|u-multitenant", "relation": "assignee", "object": "role:otraempresa|admin" },
+  { "user": "role:otraempresa|admin#assignee", "relation": "granted", "object": "permission:otraempresa|Purchasing.ApproveOrder" },
+
+  { "user": "user:jurol|u-malformed", "relation": "assignee", "object": "role:otraempresa|admin" }
 ]

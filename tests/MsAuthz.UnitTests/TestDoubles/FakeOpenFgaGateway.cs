@@ -6,8 +6,7 @@ namespace MsAuthz.UnitTests.TestDoubles;
 /// In-memory stand-in for OpenFGA. Mirrors the two behaviors that matter for the tests in this
 /// project: WriteTuples/DeleteTuples are set operations (so re-writing the same tuple is a no-op,
 /// exactly like the real gateway's OnDuplicateWrites.Ignore), and ListObjects/Read return whatever is
-/// currently stored — including, deliberately, tuples across every "tenant" seeded into the store, to
-/// reproduce the cross-tenant leak documented in MS-AUTHZ-SPEC.md §4.
+/// currently stored with no notion of tenant — exactly like OpenFGA, which only ever sees opaque ids.
 /// </summary>
 public class FakeOpenFgaGateway : IOpenFgaGateway
 {
@@ -47,8 +46,6 @@ public class FakeOpenFgaGateway : IOpenFgaGateway
 
     public Task<IReadOnlyList<string>> ListObjectsAsync(string userId, string relation, string objectType, CancellationToken cancellationToken = default)
     {
-        // Deliberately does NOT filter by tenant, exactly like the real OpenFGA ListObjects call —
-        // that filtering is the caller's job (MS-AUTHZ-SPEC.md §4).
         IReadOnlyList<string> result = _tuples
             .Where(t => t.Relation == relation && t.Object.StartsWith($"{objectType}:", StringComparison.Ordinal))
             .SelectMany(t => ResolveUsersetChain(userId, t))

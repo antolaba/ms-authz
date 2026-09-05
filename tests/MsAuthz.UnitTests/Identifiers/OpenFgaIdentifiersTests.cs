@@ -6,9 +6,19 @@ namespace MsAuthz.UnitTests.Identifiers;
 public class OpenFgaIdentifiersTests
 {
     [Fact]
-    public void User_builds_the_expected_object_string()
+    public void User_builds_the_expected_object_string_scoped_to_the_tenant()
     {
-        OpenFgaIdentifiers.User("8f3c1a94-abcd").Should().Be("user:8f3c1a94-abcd");
+        OpenFgaIdentifiers.User("jurol", "8f3c1a94-abcd").Should().Be("user:jurol|8f3c1a94-abcd");
+    }
+
+    [Theory]
+    [InlineData("8f3c#abcd")]
+    [InlineData("8f3c|abcd")]
+    [InlineData("")]
+    public void User_rejects_a_subject_id_containing_a_reserved_character(string invalidSubject)
+    {
+        var act = () => OpenFgaIdentifiers.User("jurol", invalidSubject);
+        act.Should().Throw<ArgumentException>();
     }
 
     [Fact]

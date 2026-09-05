@@ -42,19 +42,22 @@ repo concatenates these strings by hand.
 
 | Object | Shape | Example |
 |---|---|---|
-| User | `user:<keycloak user id>` | `user:8f3c1a94-...` |
+| User | `user:<tenant>\|<subject id>` | `user:jurol\|8f3c1a94-...` |
 | Role | `role:<tenant>\|<role code>` | `role:jurol\|vendedor` |
 | Permission | `permission:<tenant>\|<Modulo.Accion>` | `permission:jurol\|Sales.Write` |
 
 The separator is `|`, **never `#`** — `#` is OpenFGA's reserved userset separator
 (`object#relation`).
 
-**Cross-tenant leak, verified empirically against a real OpenFGA server (MS-AUTHZ-SPEC.md §4):**
-`ListObjects` returns permission objects across **every** tenant the subject has a role in, not just
-the one being asked about. `EffectivePermissionsService` filters by the `permission:<tenant>|` prefix
-before responding to `GET /me/permissions` — this is covered by
-`tests/MsAuthz.UnitTests/Services/EffectivePermissionsServiceTests.cs`. Skipping that filter leaks
-permissions between companies.
+**Why the subject carries the tenant too.** OpenFGA has no notion of tenant, and its non-streaming
+`ListObjects` silently truncates at a server-side cap (1000 results and a 3s deadline by default).
+With a bare `user:<subject>` the query would return that subject's permissions across every tenant
+before ms-authz could filter, so a subject with roles in enough tenants would lose permissions at
+random. With `user:<tenant>|<subject>` the same person in two tenants is two OpenFGA users, and the
+result of `ListObjects` is bounded by one tenant's catalog. This matches reality: each tenant is its
+own Keycloak realm, so the subject id is per tenant anyway. `EffectivePermissionsService` still
+filters by the `permission:<tenant>|` prefix as defence in depth; both behaviours are covered by
+`tests/MsAuthz.UnitTests/Services/EffectivePermissionsServiceTests.cs` and by `openfga/model.fga.yaml`.
 
 ## Endpoints (all behind the API key — MS-AUTHZ-SPEC.md §7)
 

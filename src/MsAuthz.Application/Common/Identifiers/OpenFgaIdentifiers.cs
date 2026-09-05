@@ -5,11 +5,14 @@ namespace MsAuthz.Application.Common.Identifiers;
 /// Nothing outside this class should concatenate "user:", "role:" or "permission:" strings by hand
 /// (MS-AUTHZ-SPEC.md §4).
 ///
-/// Object shape: exactly one ':' (type separator, reserved by OpenFGA) and, for tenant-scoped types,
-/// exactly one '|' (tenant separator, chosen here because '#' is OpenFGA's reserved userset
-/// separator — see the warning at the top of MS-AUTHZ-SPEC.md §4 about the previous, invalid DSL).
+/// Object shape: exactly one ':' (type separator, reserved by OpenFGA) and exactly one '|' (tenant
+/// separator, chosen here because '#' is OpenFGA's reserved userset separator — see the warning at
+/// the top of MS-AUTHZ-SPEC.md §4 about the previous, invalid DSL). Every type carries the tenant,
+/// the subject included: a subject only ever exists inside a tenant (one Keycloak realm per tenant),
+/// and scoping the user object is what keeps ListObjects/Read bounded to that tenant's tuples
+/// instead of every tenant the same subject id appears in (MS-AUTHZ-SPEC.md §15).
 ///
-///   user:&lt;keycloak user id&gt;
+///   user:&lt;tenant&gt;|&lt;subject id&gt;
 ///   role:&lt;tenant&gt;|&lt;role code&gt;
 ///   permission:&lt;tenant&gt;|&lt;permission code&gt;
 /// </summary>
@@ -34,11 +37,12 @@ public static class OpenFgaIdentifiers
     public static void EnsureValidCode(string value, string paramName)
         => EnsureValidComponent(value, paramName);
 
-    /// <summary>Builds the "user:&lt;id&gt;" object for a Keycloak user id.</summary>
-    public static string User(string keycloakUserId)
+    /// <summary>Builds the "user:&lt;tenant&gt;|&lt;subjectId&gt;" object.</summary>
+    public static string User(string tenantCode, string subjectId)
     {
-        EnsureValidComponent(keycloakUserId, nameof(keycloakUserId));
-        return $"{UserType}:{keycloakUserId}";
+        EnsureValidComponent(tenantCode, nameof(tenantCode));
+        EnsureValidComponent(subjectId, nameof(subjectId));
+        return $"{UserType}:{tenantCode}{TenantSeparator}{subjectId}";
     }
 
     /// <summary>Builds the "role:&lt;tenant&gt;|&lt;roleCode&gt;" object.</summary>
@@ -68,10 +72,9 @@ public static class OpenFgaIdentifiers
     /// Attempts to strip the "permission:&lt;tenant&gt;|" prefix from an OpenFGA object string,
     /// returning just the permission code when it belongs to <paramref name="tenantCode"/>.
     ///
-    /// This is the filter required by MS-AUTHZ-SPEC.md §4: <c>ListObjects</c> returns permissions
-    /// from every tenant the subject has a role in, not just the one being asked about. Every
-    /// object that does not match "permission:&lt;tenantCode&gt;|" — including ones for other
-    /// tenants — is rejected here.
+    /// With the tenant inside the user object, <c>ListObjects</c> can only reach this tenant's
+    /// tuples; this filter is the defence in depth for anything malformed that still comes back
+    /// (an assignment written across tenants, an object of the wrong shape).
     /// </summary>
     public static bool TryStripTenantPrefix(string permissionObject, string tenantCode, out string permissionCode)
     {
@@ -100,7 +103,7 @@ public static class OpenFgaIdentifiers
     /// <summary>
     /// Attempts to strip the "role:&lt;tenant&gt;|" prefix from an OpenFGA object string, the same
     /// way <see cref="TryStripTenantPrefix"/> does for permissions. Used when reading a user's role
-    /// assignments, which are just as cross-tenant-leaky as ListObjects for the same reason.
+    /// assignments.
     /// </summary>
     public static bool TryStripTenantRolePrefix(string roleObject, string tenantCode, out string roleCode)
     {

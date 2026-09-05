@@ -43,7 +43,9 @@ dependency of the client SDK, not of ms-authz itself.
 ## Identifier construction is centralized — never concatenate by hand
 
 `MsAuthz.Application/Common/Identifiers/OpenFgaIdentifiers.cs` is the only place that builds
-`user:`/`role:`/`permission:` strings. If you find yourself writing `$"role:{tenant}|{code}"`
+`user:`/`role:`/`permission:` strings. All three carry the tenant, the user included
+(`user:<tenant>|<subject>`): a subject only exists inside a tenant, and scoping the user object is
+what keeps `ListObjects` bounded to one tenant's tuples. If you find yourself writing `$"role:{tenant}|{code}"`
 somewhere else, that's a bug — route it through `OpenFgaIdentifiers` instead, both for consistency and
 because it's the one place validating that a tenant/role/permission code doesn't itself contain `:`,
 `#`, `|` or whitespace (which would produce a malformed or ambiguously-parsed OpenFGA object).
@@ -51,13 +53,16 @@ because it's the one place validating that a tenant/role/permission code doesn't
 The tenant separator is `|`. **Never `#`** — that's OpenFGA's reserved userset separator. This bit a
 previous version of the spec (see MS-AUTHZ-SPEC.md §4's warning) — don't reintroduce it.
 
-## `ListObjects` / partial `Read` are cross-tenant by construction — always filter
+## `ListObjects` / partial `Read` results are always filtered by tenant prefix
 
-OpenFGA has no notion of "tenant"; `ListObjects` and a partial `Read` (user+relation, no object) both
-return matches across every tenant, not just the one you're asking about. Every call site that uses
-either MUST filter the result through `OpenFgaIdentifiers.TryStripTenantPrefix` /
-`TryStripTenantRolePrefix` before doing anything with it. `EffectivePermissionsService` and
-`UserRoleService` are the two existing examples — follow their shape for anything new.
+OpenFGA has no notion of "tenant" and its non-streaming `ListObjects` silently truncates at a
+server-side cap (1000 results and a 3s deadline by default). Two rules follow. The user object
+carries the tenant, so a query for `user:jurol|x` can only reach jurol's tuples and the result is
+bounded by that tenant's catalog — never build a `user:` without one. And every call site that uses
+`ListObjects` or a partial `Read` still filters the result through
+`OpenFgaIdentifiers.TryStripTenantPrefix` / `TryStripTenantRolePrefix` before doing anything with it,
+as defence in depth against a malformed tuple. `EffectivePermissionsService` and `UserRoleService` are
+the two existing examples — follow their shape for anything new.
 
 ## Idempotency is achieved via OpenFGA's conflict options, not read-before-write — except where the operation is genuinely a replace
 

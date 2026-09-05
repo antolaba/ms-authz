@@ -19,9 +19,9 @@ public class UserRoleServiceTests
 
         result.Select(r => r.Code).Should().BeEquivalentTo(["vendedor", "cajero"]);
         gateway.Tuples.Should().Contain((
-            OpenFgaIdentifiers.User("user-1"), OpenFgaIdentifiers.AssigneeRelation, OpenFgaIdentifiers.Role("jurol", "vendedor")));
+            OpenFgaIdentifiers.User("jurol", "user-1"), OpenFgaIdentifiers.AssigneeRelation, OpenFgaIdentifiers.Role("jurol", "vendedor")));
         gateway.Tuples.Should().Contain((
-            OpenFgaIdentifiers.User("user-1"), OpenFgaIdentifiers.AssigneeRelation, OpenFgaIdentifiers.Role("jurol", "cajero")));
+            OpenFgaIdentifiers.User("jurol", "user-1"), OpenFgaIdentifiers.AssigneeRelation, OpenFgaIdentifiers.Role("jurol", "cajero")));
     }
 
     [Fact]
@@ -35,9 +35,9 @@ public class UserRoleServiceTests
         await sut.SetUserRolesAsync("jurol", "user-1", ["vendedor"]);
 
         gateway.Tuples.Should().NotContain((
-            OpenFgaIdentifiers.User("user-1"), OpenFgaIdentifiers.AssigneeRelation, OpenFgaIdentifiers.Role("jurol", "cajero")));
+            OpenFgaIdentifiers.User("jurol", "user-1"), OpenFgaIdentifiers.AssigneeRelation, OpenFgaIdentifiers.Role("jurol", "cajero")));
         gateway.Tuples.Should().Contain((
-            OpenFgaIdentifiers.User("user-1"), OpenFgaIdentifiers.AssigneeRelation, OpenFgaIdentifiers.Role("jurol", "vendedor")));
+            OpenFgaIdentifiers.User("jurol", "user-1"), OpenFgaIdentifiers.AssigneeRelation, OpenFgaIdentifiers.Role("jurol", "vendedor")));
     }
 
     [Fact]
@@ -51,7 +51,7 @@ public class UserRoleServiceTests
         await sut.SetUserRolesAsync("otraempresa", "user-1", []);
 
         gateway.Tuples.Should().Contain((
-            OpenFgaIdentifiers.User("user-1"), OpenFgaIdentifiers.AssigneeRelation, OpenFgaIdentifiers.Role("jurol", "vendedor")),
+            OpenFgaIdentifiers.User("jurol", "user-1"), OpenFgaIdentifiers.AssigneeRelation, OpenFgaIdentifiers.Role("jurol", "vendedor")),
             "clearing roles in one tenant must not remove the same user's role in a different tenant");
     }
 

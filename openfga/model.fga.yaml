@@ -1,8 +1,8 @@
-name: ms-authz — validación del modelo (§3/§4/§5 de MS-AUTHZ-SPEC.md)
+name: ms-authz — validación del modelo (§3/§4/§5/§15 de MS-AUTHZ-SPEC.md)
 model_file: model.fga
 tuples:
   # --- Caso 1/2: rol -> permiso directo, en jurol ---
-  - user: user:u-vendedor
+  - user: user:jurol|u-vendedor
     relation: assignee
     object: role:jurol|vendedor
   - user: role:jurol|vendedor#assignee
@@ -13,10 +13,10 @@ tuples:
     object: permission:jurol|Sales.Read
 
   # --- Caso 3: union de dos roles del mismo tenant ---
-  - user: user:u-vendedor-stock
+  - user: user:jurol|u-vendedor-stock
     relation: assignee
     object: role:jurol|vendedor
-  - user: user:u-vendedor-stock
+  - user: user:jurol|u-vendedor-stock
     relation: assignee
     object: role:jurol|stock
   - user: role:jurol|stock#assignee
@@ -32,7 +32,7 @@ tuples:
   - user: role:jurol|gerente#assignee
     relation: assignee
     object: role:jurol|vendedor
-  - user: user:u-gerente
+  - user: user:jurol|u-gerente
     relation: assignee
     object: role:jurol|gerente
   # permiso exclusivo de gerente, para probar que la herencia va en un solo
@@ -42,8 +42,9 @@ tuples:
     object: permission:jurol|Management.Approve
 
   # --- Caso 5: aislamiento entre tenants ---
-  # u-crosstenant es vendedor SOLO en jurol.
-  - user: user:u-crosstenant
+  # u-crosstenant es vendedor SOLO en jurol. El mismo subject en otraempresa
+  # es otro objeto user (user:otraempresa|u-crosstenant), sin tuplas.
+  - user: user:jurol|u-crosstenant
     relation: assignee
     object: role:jurol|vendedor
   # Existe un rol con el MISMO code en otro tenant, y ese si tiene el permiso
@@ -55,39 +56,47 @@ tuples:
 
   # --- Caso 6: user:u-norol no tiene ninguna tupla (a proposito) ---
 
-  # --- Caso 7: ListObjects cruza tenants ---
-  - user: user:u-multitenant
+  # --- Caso 7: ListObjects queda acotado al tenant porque el user lleva tenant ---
+  # La misma persona con rol en dos tenants son DOS objetos user distintos.
+  - user: user:jurol|u-multitenant
     relation: assignee
     object: role:jurol|vendedor
-  - user: user:u-multitenant
+  - user: user:otraempresa|u-multitenant
     relation: assignee
     object: role:otraempresa|admin
   - user: role:otraempresa|admin#assignee
     relation: granted
     object: permission:otraempresa|Purchasing.ApproveOrder
 
+  # --- Caso 8: tupla malformada (asignacion cruzada entre tenants) ---
+  # No deberia existir nunca — ms-authz solo escribe user:<t>|x sobre role:<t>|y.
+  # Documenta por que el filtro por prefijo sigue existiendo del lado de ms-authz.
+  - user: user:jurol|u-malformed
+    relation: assignee
+    object: role:otraempresa|admin
+
 tests:
   - name: "Caso 1 — permiso directo por rol (true)"
     check:
-      - user: user:u-vendedor
+      - user: user:jurol|u-vendedor
         object: permission:jurol|Sales.Write
         assertions:
           granted: true
 
   - name: "Caso 2 — permiso que el usuario NO tiene (false)"
     check:
-      - user: user:u-vendedor
+      - user: user:jurol|u-vendedor
         object: permission:jurol|Purchasing.ApproveOrder
         assertions:
           granted: false
 
   - name: "Caso 3 — union de dos roles del mismo tenant (vendedor + stock)"
     check:
-      - user: user:u-vendedor-stock
+      - user: user:jurol|u-vendedor-stock
         object: permission:jurol|Sales.Write
         assertions:
           granted: true
-      - user: user:u-vendedor-stock
+      - user: user:jurol|u-vendedor-stock
         object: permission:jurol|Stock.Write
         assertions:
           granted: true
@@ -96,18 +105,18 @@ tests:
     check:
       # u-gerente solo tiene el rol gerente asignado; debe obtener el
       # permiso de vendedor (Sales.Write) por herencia.
-      - user: user:u-gerente
+      - user: user:jurol|u-gerente
         object: permission:jurol|Sales.Write
         assertions:
           granted: true
       # y tambien conserva su propio permiso exclusivo.
-      - user: user:u-gerente
+      - user: user:jurol|u-gerente
         object: permission:jurol|Management.Approve
         assertions:
           granted: true
       # direccion: un vendedor NO debe heredar el permiso exclusivo de
       # gerente (si esto diera true, la tupla de jerarquia estaria invertida).
-      - user: user:u-vendedor
+      - user: user:jurol|u-vendedor
         object: permission:jurol|Management.Approve
         assertions:
           granted: false
@@ -116,40 +125,52 @@ tests:
     check:
       # El permiso existe y esta concedido a role:otraempresa|vendedor, que
       # tiene el mismo code que el rol de u-crosstenant en jurol. Si el
-      # aislamiento por prefijo de tenant fallara, esto daria true.
-      - user: user:u-crosstenant
+      # aislamiento por tenant en los ids fallara, esto daria true.
+      - user: user:otraempresa|u-crosstenant
         object: permission:otraempresa|Sales.Write
         assertions:
           granted: false
       # Mismo control contra un permiso de otro tenant concedido a otro rol.
-      - user: user:u-crosstenant
+      - user: user:otraempresa|u-crosstenant
         object: permission:otraempresa|Purchasing.ApproveOrder
         assertions:
           granted: false
       # Y el control positivo: en su propio tenant el mismo rol si funciona,
       # asi el caso no puede pasar por estar todo roto.
-      - user: user:u-crosstenant
+      - user: user:jurol|u-crosstenant
         object: permission:jurol|Sales.Write
         assertions:
           granted: true
 
   - name: "Caso 6 — usuario sin ningun rol (false)"
     check:
-      - user: user:u-norol
+      - user: user:jurol|u-norol
         object: permission:jurol|Sales.Write
         assertions:
           granted: false
-      - user: user:u-norol
+      - user: user:jurol|u-norol
         object: permission:jurol|Purchasing.ApproveOrder
         assertions:
           granted: false
 
-  - name: "Caso 7 — ListObjects devuelve permisos de TODOS los tenants del usuario (evidencia empirica del filtrado del lado del cliente que exige la spec en §4)"
+  - name: "Caso 7 — ListObjects solo alcanza el tenant del user (el tope de resultados del servidor queda acotado al catalogo de un tenant)"
     list_objects:
-      - user: user:u-multitenant
+      - user: user:jurol|u-multitenant
         type: permission
         assertions:
           granted:
             - permission:jurol|Sales.Write
             - permission:jurol|Sales.Read
+      - user: user:otraempresa|u-multitenant
+        type: permission
+        assertions:
+          granted:
+            - permission:otraempresa|Purchasing.ApproveOrder
+
+  - name: "Caso 8 — una asignacion cruzada malformada SI llega por ListObjects: por eso ms-authz filtra por prefijo igual"
+    list_objects:
+      - user: user:jurol|u-malformed
+        type: permission
+        assertions:
+          granted:
             - permission:otraempresa|Purchasing.ApproveOrder

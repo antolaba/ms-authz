@@ -23,19 +23,17 @@ public interface IOpenFgaGateway
 
     /// <summary>
     /// Partial read: every object of <paramref name="objectType"/> connected to <paramref name="user"/>
-    /// via <paramref name="relation"/>, across every tenant. OpenFGA requires the object type on a
-    /// partial read — a tuple key with only user and relation is rejected. Callers MUST filter the
-    /// result by tenant prefix themselves
-    /// (see <see cref="Common.Identifiers.OpenFgaIdentifiers"/>) — OpenFGA has no notion of tenant and
-    /// will return matches across every tenant the user has a relation in, the same way ListObjects does.
+    /// via <paramref name="relation"/>. OpenFGA requires the object type on a partial read — a tuple
+    /// key with only user and relation is rejected. OpenFGA has no notion of tenant: callers still
+    /// filter the result by tenant prefix (see <see cref="Common.Identifiers.OpenFgaIdentifiers"/>).
     /// </summary>
     Task<IReadOnlyList<string>> ReadObjectsForUserAsync(string user, string relation, string objectType, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Wraps OpenFGA's ListObjects. ⚠️ Verified empirically (MS-AUTHZ-SPEC.md §4): this returns objects
-    /// across ALL tenants the subject has any role in, not just one. Callers MUST filter by tenant
-    /// prefix — this method does not and cannot do it, since OpenFGA itself doesn't know what a
-    /// tenant is.
+    /// Wraps OpenFGA's non-streaming ListObjects, which the server caps (1000 results and a 3s
+    /// deadline by default) by silently returning a partial list. Keeping the user object
+    /// tenant-scoped is what keeps the result bounded to one tenant's catalog; callers still filter
+    /// by tenant prefix, since OpenFGA itself doesn't know what a tenant is.
     /// </summary>
     Task<IReadOnlyList<string>> ListObjectsAsync(string userId, string relation, string objectType, CancellationToken cancellationToken = default);
 }

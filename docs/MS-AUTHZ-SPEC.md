@@ -563,3 +563,14 @@ lista de tenants; el alta de un tenant es un sync de uno.
 OpenFGA ofrece dentro de un store), pero un sistema sin tenants usa un código fijo (`default`) y lo
 configura una vez como `Authz:DefaultTenantCode` en `Authz.Client`; el behavior lo usa cuando el
 accessor no resuelve tenant. El servidor no cambia.
+
+**El subject también lleva tenant: `user:<tenant>|<subject>`.** Reemplaza al `user:<keycloak user id>`
+del §4. El motivo es el tope de `ListObjects`: la variante no streaming corta en
+`OPENFGA_LIST_OBJECTS_MAX_RESULTS` (1000 por defecto) y en `OPENFGA_LIST_OBJECTS_DEADLINE` (3s), y en
+los dos casos devuelve una lista parcial **sin error**. Como el filtro por tenant era del lado de
+`ms-authz`, un `admin` en 13 empresas con el catálogo actual ya superaba los 1000 objetos antes de
+filtrar, y perdía permisos al azar. Con el tenant dentro del user, `ListObjects(user:jurol|x)` sólo
+puede alcanzar tuplas de jurol y el resultado queda acotado al catálogo de un tenant. Es fiel a la
+realidad además: cada tenant es un realm de Keycloak distinto, así que el `sub` ya era por tenant. El
+filtro por prefijo del §4 se mantiene como defensa ante una tupla malformada (caso 8 de
+`openfga/model.fga.yaml`), pero deja de ser lo único que sostiene el aislamiento. El modelo DSL no cambia.
