@@ -23,6 +23,7 @@ RUN dotnet restore "src/MsAuthz.Api/MsAuthz.Api.csproj"
 COPY src/MsAuthz.Api/ src/MsAuthz.Api/
 COPY src/MsAuthz.Application/ src/MsAuthz.Application/
 COPY src/MsAuthz.Infrastructure/ src/MsAuthz.Infrastructure/
+COPY openfga/model.json openfga/model.json
 
 WORKDIR "/src/src/MsAuthz.Api"
 RUN dotnet build "MsAuthz.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build

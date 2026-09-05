@@ -485,7 +485,8 @@ Aparecieron dos bugs que los tests unitarios no podían ver, porque mockeaban el
 
 También quedó cubierto el hueco de arranque: el store **no se crea solo** y la config viene con
 `StoreId = "REPLACE_WITH_DEV_STORE_ID"`, así que sin ese paso el servicio levanta pero toda llamada a
-OpenFGA falla. `ms-authz/scripts/bootstrap-openfga.sh` lo resuelve y está probado.
+OpenFGA falla. `ms-authz/scripts/bootstrap-openfga.sh` lo resuelve y está probado. → ver §15: el
+script desapareció, `ms-authz` se bootstrapea solo.
 
 ## 13. Riesgos
 
@@ -574,3 +575,12 @@ puede alcanzar tuplas de jurol y el resultado queda acotado al catálogo de un t
 realidad además: cada tenant es un realm de Keycloak distinto, así que el `sub` ya era por tenant. El
 filtro por prefijo del §4 se mantiene como defensa ante una tupla malformada (caso 8 de
 `openfga/model.fga.yaml`), pero deja de ser lo único que sostiene el aislamiento. El modelo DSL no cambia.
+
+**`ms-authz` se bootstrapea solo.** `scripts/bootstrap-openfga.sh` dependía de tener la CLI `fga`
+instalada en la máquina de quien despliega y de copiar a mano el `StoreId` a la config: un paso de
+deploy que no se puede reutilizar. Ahora, al arrancar, `ms-authz` busca un store con el nombre de
+`OpenFga:StoreName` (`ms-authz` por defecto), lo crea si no existe, y escribe el modelo si el store no
+tiene ninguno. El modelo va embebido en el assembly como `openfga/model.json`, generado desde el
+`model.fga` canónico. Si OpenFGA todavía no responde, reintenta unos 30 segundos y después no levanta.
+Desplegar un sistema nuevo queda en: OpenFGA, el `catalog.json`, `ms-authz`, y un `POST /catalog/sync`.
+La CLI `fga` queda como herramienta de desarrollo para correr `model.fga.yaml`, nada más.

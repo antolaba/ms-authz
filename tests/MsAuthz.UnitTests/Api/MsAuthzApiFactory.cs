@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using MsAuthz.Application.Interfaces;
+using MsAuthz.Infrastructure.OpenFga;
 using MsAuthz.UnitTests.TestDoubles;
 
 namespace MsAuthz.UnitTests.Api;
@@ -21,7 +22,6 @@ public class MsAuthzApiFactory : WebApplicationFactory<Program>
                 ["Security:ApiKey"] = ApiKey,
                 ["Catalog:Path"] = "unused.json",
                 ["OpenFga:ApiUrl"] = "http://localhost",
-                ["OpenFga:StoreId"] = "unused",
             });
         });
 
@@ -29,6 +29,9 @@ public class MsAuthzApiFactory : WebApplicationFactory<Program>
         {
             services.RemoveAll<IOpenFgaGateway>();
             services.AddSingleton<IOpenFgaGateway>(new FakeOpenFgaGateway());
+
+            services.RemoveAll<IOpenFgaAdminApi>();
+            services.AddSingleton<IOpenFgaAdminApi>(new FakeOpenFgaAdminApi());
 
             services.RemoveAll<ICatalogRepository>();
             services.AddSingleton<ICatalogRepository>(new FakeCatalogRepository());

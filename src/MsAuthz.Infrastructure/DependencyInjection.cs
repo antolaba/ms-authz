@@ -16,12 +16,15 @@ public static class DependencyInjection
         var catalogSettings = BindAndValidate<CatalogSettings>(configuration, CatalogSettings.SectionName);
         var openFgaSettings = BindAndValidate<OpenFgaSettings>(configuration, OpenFgaSettings.SectionName);
 
+        services.AddSingleton(openFgaSettings);
         services.AddSingleton(_ => new OpenFgaClient(new ClientConfiguration
         {
             ApiUrl = openFgaSettings.ApiUrl,
             StoreId = openFgaSettings.StoreId,
             AuthorizationModelId = openFgaSettings.AuthorizationModelId,
         }));
+        services.AddSingleton<IOpenFgaAdminApi, OpenFgaAdminApi>();
+        services.AddHostedService<OpenFgaBootstrapHostedService>();
 
         services.AddSingleton<ICatalogRepository>(_ =>
             new FileCatalogRepository(CatalogFileLoader.Load(ResolveCatalogPath(catalogSettings.Path))));

@@ -76,16 +76,17 @@ No Docker, no real OpenFGA, no database is required to build or test this repo �
 `dotnet test` both run standalone (see the Testing section). To actually run `MsAuthz.Api` against a
 live stack:
 
-1. An OpenFGA instance + store, with the model loaded from this repo's `openfga/model.fga`
-   (`./scripts/bootstrap-openfga.sh`, or `fga model write --store-id <id> --file openfga/model.fga`,
-   or the OpenFGA Playground in dev). That file is the validated, canonical model
-   (MS-AUTHZ-SPEC.md §3, §12 step 2). Any .NET system adopting ms-authz loads the same file into its
-   own store, unmodified.
+1. A reachable OpenFGA instance. Nothing else: on startup ms-authz looks for a store named
+   `OpenFga:StoreName` (default `ms-authz`), creates it if missing, and writes the authorization
+   model into it if the store has none. The model is embedded in the assembly from
+   `openfga/model.json`, generated from the canonical `openfga/model.fga` (see `openfga/README.md`).
+   Set `OpenFga:StoreId` / `OpenFga:AuthorizationModelId` only if you want to pin a specific one.
+   If OpenFGA is not up yet, ms-authz retries for about thirty seconds and then fails to start.
 2. A catalog file — `Catalog:Path` in configuration, defaulting to `catalog.json` next to the binary.
    `docs/catalog.example.json` is a small generic example (`appsettings.Development.json` already
    points at it); a real deployment supplies its own.
 3. `appsettings.Development.json` in `src/MsAuthz.Api` already points at the conventional local
-   OpenFGA port (`8082`) — fill in `OpenFga:StoreId` with your store's id.
+   OpenFGA port (`8082`).
 4. `dotnet run --project src/MsAuthz.Api`
 
 The service listens on **port 6010** (MS-AUTHZ-SPEC.md §6), matching the `ms-filestore` family

@@ -4,7 +4,8 @@
 # docker-compose.yml would add once ms-authz is wired into a system's local stack
 # (MS-AUTHZ-SPEC.md §6, §12 step 3) — this repo does not touch other repos, so nothing here is
 # applied automatically. Copy the `ms-authz` service below into the target compose file, next to
-# `openfga` and `openfga-migrate`, which infra already has.
+# `openfga` and `openfga-migrate`, which infra already has. ms-authz creates its OpenFGA store and
+# writes the authorization model itself on startup, so there is no bootstrap step to run.
 #
 # Build context is this repo's root (ms-authz/), not this docker/ directory — see the comment at
 # the top of src/MsAuthz.Api/Dockerfile.
@@ -17,8 +18,7 @@ services:
     environment:
       Catalog__Path: "/app/catalog.json"
       OpenFga__ApiUrl: "http://openfga:8080"          # container-internal port — openfga's HTTP default, not the host-remapped 8082
-      OpenFga__StoreId: "${OPENFGA_STORE_ID}"
-      OpenFga__AuthorizationModelId: "${OPENFGA_AUTHORIZATION_MODEL_ID:-}"
+      OpenFga__StoreName: "${MS_AUTHZ_STORE_NAME:-ms-authz}"
       Security__ApiKey: "${MS_AUTHZ_API_KEY}"
     depends_on:
       openfga:

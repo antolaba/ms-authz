@@ -26,8 +26,11 @@ uses:
   Infrastructure instead of a Domain project, because there is no Domain project: they're consumed
   nowhere else.
 - `MsAuthz.Infrastructure` — `FileCatalogRepository` (loads/serves the catalog from a JSON file, see
-  "Catalog is a file, ms-authz is stateless" below) and `OpenFgaGateway`, the only class talking to
-  OpenFGA. Everything else in the codebase reaches OpenFGA through `IOpenFgaGateway`.
+  "Catalog is a file, ms-authz is stateless" below), `OpenFgaGateway` (the only class issuing tuple
+  reads/writes to OpenFGA; everything else goes through `IOpenFgaGateway`) and
+  `OpenFgaBootstrapHostedService` (finds or creates the store and writes the embedded model at
+  startup, through `IOpenFgaAdminApi`). `openfga/model.json` is embedded into this assembly and is
+  generated from `openfga/model.fga` — regenerate it in the same commit if the DSL ever changes.
 - `Authz.Client` — the NuGet SDK. Separate solution folder, its own README, packable independently.
 
 ## No MediatR / CQRS on the server side — this is a deliberate deviation from `estudio-contable-backend`
@@ -104,7 +107,7 @@ unexpected exception is left to reach `GlobalExceptionHandler`.
 ## Testing without infrastructure
 
 `dotnet build MsAuthz.slnx && dotnet test MsAuthz.slnx` must always succeed with **no** Postgres, no
-OpenFGA, no Docker. `tests/MsAuthz.UnitTests/TestDoubles/` holds in-memory fakes of `IOpenFgaGateway`
+OpenFGA, no Docker. `tests/MsAuthz.UnitTests/TestDoubles/` holds in-memory fakes of `IOpenFgaGateway`, `IOpenFgaAdminApi`
 and `ICatalogRepository` — extend those, don't reach for a real OpenFGA or a database for anything
 covered by this repo's unit tests. `CatalogFileLoader` is the one piece of Infrastructure worth
 testing directly (it has real parsing/validation logic, not just a thin OpenFGA/HTTP wrapper) —

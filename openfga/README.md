@@ -7,7 +7,11 @@ tenant (`user:<tenant>|<subject>`, §15): la suite se volvió a correr con `fga 
 
 ## Archivos
 
-- `model.fga` — el modelo DSL (schema 1.1), idéntico al del §3 de la spec.
+- `model.fga` — el modelo DSL (schema 1.1), idéntico al del §3 de la spec. Es el canónico.
+- `model.json` — el mismo modelo en el JSON que acepta la API de OpenFGA, **generado** desde
+  `model.fga` con `fga model transform --file model.fga > model.json`. `MsAuthz.Infrastructure` lo
+  embebe en el assembly y lo escribe en el store al arrancar si el store no tiene modelo. Si alguna
+  vez cambia `model.fga`, hay que regenerar este archivo en el mismo commit.
 - `model.fga.yaml` — suite de tests en el formato nativo de `fga model test` (store test):
   tuplas de ejemplo + 8 casos de test que cubren §12 punto 2 y el §15.
 - `tuples.json` — las mismas tuplas en formato `fga tuple write --file`, usadas para la
@@ -46,7 +50,7 @@ docker run --rm -d -p 8085:8080 --name openfga-validate openfga/openfga:v1.19.0 
 export FGA_API_URL=http://localhost:8085
 STORE_ID=$(fga store create --name ms-authz-validate | jq -r .store.id)
 
-fga model write --store-id "$STORE_ID" --file model.fga
+fga model write --store-id "$STORE_ID" --file model.fga   # o dejar que ms-authz lo escriba al arrancar
 fga tuple write --store-id "$STORE_ID" --file tuples.json
 
 # Checks puntuales, ejemplo:
