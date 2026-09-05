@@ -558,3 +558,8 @@ y `Read` parcial (§4), y el SDK `Authz.Client` (§8) — que ahora además expo
 **Un solo endpoint de materialización.** `POST /tenants` (§7) desaparece: dar de alta un tenant y
 re-expandir el catálogo eran la misma operación con dos puertas. Queda sólo `POST /catalog/sync` con la
 lista de tenants; el alta de un tenant es un sync de uno.
+
+**Sistemas single-tenant.** El tenant sigue siendo obligatorio en los ids (es el único aislamiento que
+OpenFGA ofrece dentro de un store), pero un sistema sin tenants usa un código fijo (`default`) y lo
+configura una vez como `Authz:DefaultTenantCode` en `Authz.Client`; el behavior lo usa cuando el
+accessor no resuelve tenant. El servidor no cambia.

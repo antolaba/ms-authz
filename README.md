@@ -109,6 +109,7 @@ cache miss.
 using Authz.Client;
 
 // appsettings.json: { "Authz": { "BaseUrl": "http://ms-authz:6010", "ApiKey": "...", "CacheTtl": "00:05:00" } }
+// Single-tenant host? Add "DefaultTenantCode": "default" — see the IAuthzRequestContextAccessor section.
 builder.Services.AddAuthzClient(builder.Configuration);
 
 // The host MUST also register its own IAuthzRequestContextAccessor — Authz.Client cannot provide
@@ -144,6 +145,29 @@ public class EstudioContableAuthzRequestContextAccessor(IRequestContext requestC
     public string? SubjectId => requestContext.CurrentTokenUserInfo?.KeycloakUserId;
 }
 ```
+
+#### Single-tenant hosts
+
+A system with no notion of tenant still needs one for ms-authz — the tenant is the namespace every
+role and permission tuple lives in, and OpenFGA has no other way to keep two deployments' data apart in
+one store. Pick a constant (`default` works), sync it once into ms-authz, and configure it as
+`Authz:DefaultTenantCode`. `PermissionAuthorizationBehavior` uses it whenever the accessor's
+`TenantCode` is null, so the accessor only has to resolve the subject:
+
+```csharp
+public class SingleTenantAuthzRequestContextAccessor(IHttpContextAccessor httpContextAccessor) : IAuthzRequestContextAccessor
+{
+    public string? TenantCode => null;
+    public string? SubjectId => httpContextAccessor.HttpContext?.User.FindFirst("sub")?.Value;
+}
+```
+
+```bash
+curl -X POST http://ms-authz:6010/catalog/sync -H "X-Api-Key: $KEY" \
+  -H "Content-Type: application/json" -d '{"tenantCodes":["default"]}'
+```
+
+A subject that cannot be resolved is still denied, default tenant or not.
 
 ### Protecting a command/query
 

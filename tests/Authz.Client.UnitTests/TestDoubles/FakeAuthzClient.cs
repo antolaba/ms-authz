@@ -8,10 +8,13 @@ public class FakeAuthzClient : IAuthzClient
 
     public int CallCount { get; private set; }
 
+    public string? LastTenantCode { get; private set; }
+
     public Task<IReadOnlyCollection<string>> GetEffectivePermissionsAsync(
         string tenantCode, string subjectId, CancellationToken cancellationToken = default)
     {
         CallCount++;
+        LastTenantCode = tenantCode;
         return Task.FromResult<IReadOnlyCollection<string>>(_permissions);
     }
 }

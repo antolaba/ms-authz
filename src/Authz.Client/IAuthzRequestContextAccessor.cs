@@ -16,7 +16,11 @@ namespace Authz.Client;
 /// </summary>
 public interface IAuthzRequestContextAccessor
 {
-    /// <summary>Tenant code for the current request, or null if none is resolved (e.g. anonymous/system requests).</summary>
+    /// <summary>
+    /// Tenant code for the current request, or null if none is resolved. A null falls back to
+    /// <see cref="AuthzClientOptions.DefaultTenantCode"/>, which is how a single-tenant host avoids
+    /// resolving a tenant per request; if that is null too, the request is denied.
+    /// </summary>
     string? TenantCode { get; }
 
     /// <summary>Keycloak user id for the current request's subject, or null if none is resolved.</summary>

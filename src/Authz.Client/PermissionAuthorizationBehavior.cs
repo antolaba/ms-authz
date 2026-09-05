@@ -2,6 +2,7 @@ using Authz.Client.Exceptions;
 using Authz.Client.Extensions;
 using MediatR;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Authz.Client;
 
@@ -18,6 +19,7 @@ namespace Authz.Client;
 public class PermissionAuthorizationBehavior<TRequest, TResponse>(
     IAuthzClient authzClient,
     IAuthzRequestContextAccessor requestContextAccessor,
+    IOptions<AuthzClientOptions> options,
     ILogger<PermissionAuthorizationBehavior<TRequest, TResponse>> logger)
     : IPipelineBehavior<TRequest, TResponse>
     where TRequest : notnull
@@ -34,7 +36,7 @@ public class PermissionAuthorizationBehavior<TRequest, TResponse>(
 
         var requiredCodes = requestType.GetRequiredPermissionCodes();
 
-        var tenantCode = requestContextAccessor.TenantCode;
+        var tenantCode = requestContextAccessor.TenantCode ?? options.Value.DefaultTenantCode;
         var subjectId = requestContextAccessor.SubjectId;
 
         if (string.IsNullOrEmpty(tenantCode) || string.IsNullOrEmpty(subjectId))

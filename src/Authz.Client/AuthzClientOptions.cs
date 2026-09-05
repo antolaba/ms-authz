@@ -19,4 +19,11 @@ public class AuthzClientOptions
     public TimeSpan CacheTtl { get; set; } = TimeSpan.FromMinutes(5);
 
     public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Tenant code used by <see cref="PermissionAuthorizationBehavior{TRequest,TResponse}"/> when
+    /// <see cref="IAuthzRequestContextAccessor.TenantCode"/> is null. For single-tenant hosts: set it
+    /// once, sync that same code into ms-authz, and the accessor only has to supply the subject.
+    /// </summary>
+    public string? DefaultTenantCode { get; set; }
 }
