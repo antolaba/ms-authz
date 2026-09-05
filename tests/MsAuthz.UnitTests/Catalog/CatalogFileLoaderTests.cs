@@ -71,6 +71,66 @@ public class CatalogFileLoaderTests : IDisposable
     }
 
     [Fact]
+    public void Load_expands_included_roles_transitively_into_effective_permissions()
+    {
+        var path = WriteCatalog("""
+        {
+          "permissions": [
+            { "code": "Sales.Read", "module": "Sales", "description": null },
+            { "code": "Sales.Write", "module": "Sales", "description": null },
+            { "code": "Sales.Void", "module": "Sales", "description": null }
+          ],
+          "roles": [
+            { "code": "viewer", "name": "Viewer", "description": null, "permissions": ["Sales.Read"] },
+            { "code": "seller", "name": "Seller", "description": null, "permissions": ["Sales.Write"], "includes": ["viewer"] },
+            { "code": "manager", "name": "Manager", "description": null, "permissions": ["Sales.Void"], "includes": ["seller"] }
+          ]
+        }
+        """);
+
+        var snapshot = CatalogFileLoader.Load(path);
+
+        snapshot.Roles.Single(r => r.Code == "manager").PermissionCodes.Should().Equal("Sales.Read", "Sales.Void", "Sales.Write");
+        snapshot.Roles.Single(r => r.Code == "seller").PermissionCodes.Should().Equal("Sales.Read", "Sales.Write");
+        snapshot.Roles.Single(r => r.Code == "viewer").PermissionCodes.Should().Equal("Sales.Read");
+    }
+
+    [Fact]
+    public void Load_throws_when_a_role_includes_a_role_that_does_not_exist()
+    {
+        var path = WriteCatalog("""
+        {
+          "permissions": [ { "code": "Sales.Read", "module": "Sales", "description": null } ],
+          "roles": [
+            { "code": "seller", "name": "Seller", "description": null, "permissions": ["Sales.Read"], "includes": ["ghost"] }
+          ]
+        }
+        """);
+
+        var act = () => CatalogFileLoader.Load(path);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*seller*ghost*");
+    }
+
+    [Fact]
+    public void Load_throws_on_an_inclusion_cycle()
+    {
+        var path = WriteCatalog("""
+        {
+          "permissions": [ { "code": "Sales.Read", "module": "Sales", "description": null } ],
+          "roles": [
+            { "code": "a", "name": "A", "description": null, "permissions": ["Sales.Read"], "includes": ["b"] },
+            { "code": "b", "name": "B", "description": null, "permissions": [], "includes": ["a"] }
+          ]
+        }
+        """);
+
+        var act = () => CatalogFileLoader.Load(path);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*cycle*");
+    }
+
+    [Fact]
     public void Load_throws_when_a_role_references_a_permission_that_does_not_exist()
     {
         var path = WriteCatalog("""

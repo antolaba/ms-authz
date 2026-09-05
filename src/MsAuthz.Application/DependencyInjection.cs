@@ -10,8 +10,6 @@ public static class DependencyInjection
         services.AddScoped<IEffectivePermissionsService, EffectivePermissionsService>();
         services.AddScoped<ICatalogService, CatalogService>();
         services.AddScoped<IUserRoleService, UserRoleService>();
-        services.AddScoped<ITenantProvisioningService, TenantProvisioningService>();
-        services.AddScoped<ICatalogSyncService, CatalogSyncService>();
 
         return services;
     }

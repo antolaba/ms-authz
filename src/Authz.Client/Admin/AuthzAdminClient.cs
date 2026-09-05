@@ -65,27 +65,6 @@ public class AuthzAdminClient(HttpClient httpClient, ILogger<AuthzAdminClient> l
         return roles ?? [];
     }
 
-    public async Task<IReadOnlyList<string>> SyncCatalogAsync(
-        IReadOnlyList<string> tenantCodes, CancellationToken cancellationToken = default)
-    {
-        logger.LogDebug("Syncing catalog in ms-authz for tenants {TenantCodes}", tenantCodes);
-
-        var response = await httpClient.PostAsJsonAsync(
-            "catalog/sync", new { tenantCodes }, JsonOptions, cancellationToken);
-
-        if (response.StatusCode == HttpStatusCode.BadRequest)
-        {
-            var detail = await TryReadProblemDetailAsync(response, cancellationToken);
-            logger.LogWarning("ms-authz rejected catalog sync for tenants {TenantCodes}: {Detail}", tenantCodes, detail);
-            throw new AuthzInvalidRequestException(detail ?? "'tenantCodes' is required.");
-        }
-
-        response.EnsureSuccessStatusCode();
-
-        var syncedTenants = await response.Content.ReadFromJsonAsync<List<string>>(JsonOptions, cancellationToken);
-        return syncedTenants ?? [];
-    }
-
     private static string BuildUserRolesUri(string tenantCode, string userId)
         => $"users/{Uri.EscapeDataString(userId)}/roles?tenant={Uri.EscapeDataString(tenantCode)}";
 

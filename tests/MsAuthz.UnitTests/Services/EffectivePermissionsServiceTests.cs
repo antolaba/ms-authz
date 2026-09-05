@@ -5,105 +5,79 @@ using MsAuthz.UnitTests.TestDoubles;
 
 namespace MsAuthz.UnitTests.Services;
 
-/// <summary>
-/// Tenant isolation on GET /me/permissions. The user object carries the tenant, so a subject with
-/// roles in two tenants is two different OpenFGA users and ListObjects for one of them can only reach
-/// that tenant's tuples. The prefix filter in the service stays as defence in depth against anything
-/// malformed in the store (MS-AUTHZ-SPEC.md §15).
-/// </summary>
 public class EffectivePermissionsServiceTests
 {
+    private static readonly FakeCatalogRepository Catalog = new FakeCatalogRepository()
+        .WithRole("vendedor", "Vendedor", "Sales.Read", "Sales.Write")
+        .WithRole("cajero", "Cajero", "Cashier.Open", "Cashier.Close", "Sales.Read")
+        .WithRole("comprador", "Comprador", "Purchasing.ApproveOrder");
+
     [Fact]
-    public async Task GetEffectivePermissionsAsync_returns_only_the_permissions_of_the_tenant_asked_for()
+    public async Task GetEffectivePermissionsAsync_unions_the_catalog_permissions_of_every_assigned_role()
     {
         var gateway = new FakeOpenFgaGateway();
-        SeedRoleWithPermissions(gateway, "jurol", "8f3c1a94-user", "vendedor", "Sales.Read", "Sales.Write");
-        SeedRoleWithPermissions(gateway, "otraempresa", "8f3c1a94-user", "comprador", "Purchasing.ApproveOrder");
+        Assign(gateway, "jurol", "u1", "vendedor");
+        Assign(gateway, "jurol", "u1", "cajero");
+        var sut = new EffectivePermissionsService(gateway, Catalog, TestLogger.For<EffectivePermissionsService>());
 
-        var sut = new EffectivePermissionsService(gateway, TestLogger.For<EffectivePermissionsService>());
+        var result = await sut.GetEffectivePermissionsAsync("jurol", "u1");
 
-        var result = await sut.GetEffectivePermissionsAsync("jurol", "8f3c1a94-user");
-
-        result.Should().BeEquivalentTo(["Sales.Read", "Sales.Write"]);
-        result.Should().NotContain("Purchasing.ApproveOrder");
+        result.Should().Equal("Cashier.Close", "Cashier.Open", "Sales.Read", "Sales.Write");
     }
 
     [Fact]
-    public async Task GetEffectivePermissionsAsync_returns_only_the_other_tenants_permissions_when_asked_for_it()
+    public async Task GetEffectivePermissionsAsync_returns_only_the_tenant_asked_for()
     {
         var gateway = new FakeOpenFgaGateway();
-        SeedRoleWithPermissions(gateway, "jurol", "8f3c1a94-user", "vendedor", "Sales.Read", "Sales.Write");
-        SeedRoleWithPermissions(gateway, "otraempresa", "8f3c1a94-user", "comprador", "Purchasing.ApproveOrder");
+        Assign(gateway, "jurol", "u1", "vendedor");
+        Assign(gateway, "otraempresa", "u1", "comprador");
+        var sut = new EffectivePermissionsService(gateway, Catalog, TestLogger.For<EffectivePermissionsService>());
 
-        var sut = new EffectivePermissionsService(gateway, TestLogger.For<EffectivePermissionsService>());
+        var inJurol = await sut.GetEffectivePermissionsAsync("jurol", "u1");
+        var inOtra = await sut.GetEffectivePermissionsAsync("otraempresa", "u1");
 
-        var result = await sut.GetEffectivePermissionsAsync("otraempresa", "8f3c1a94-user");
-
-        result.Should().BeEquivalentTo(["Purchasing.ApproveOrder"]);
+        inJurol.Should().Equal("Sales.Read", "Sales.Write");
+        inOtra.Should().Equal("Purchasing.ApproveOrder");
     }
 
     [Fact]
     public async Task GetEffectivePermissionsAsync_returns_empty_for_a_tenant_the_subject_has_no_role_in()
     {
         var gateway = new FakeOpenFgaGateway();
-        SeedRoleWithPermissions(gateway, "jurol", "8f3c1a94-user", "vendedor", "Sales.Read");
+        Assign(gateway, "jurol", "u1", "vendedor");
+        var sut = new EffectivePermissionsService(gateway, Catalog, TestLogger.For<EffectivePermissionsService>());
 
-        var sut = new EffectivePermissionsService(gateway, TestLogger.For<EffectivePermissionsService>());
-
-        var result = await sut.GetEffectivePermissionsAsync("unrelatedtenant", "8f3c1a94-user");
+        var result = await sut.GetEffectivePermissionsAsync("unrelatedtenant", "u1");
 
         result.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task GetEffectivePermissionsAsync_unions_permissions_from_two_roles_in_the_same_tenant()
+    public async Task GetEffectivePermissionsAsync_ignores_an_assigned_role_that_is_no_longer_in_the_catalog()
     {
         var gateway = new FakeOpenFgaGateway();
-        SeedRoleWithPermissions(gateway, "jurol", "8f3c1a94-user", "vendedor", "Sales.Read", "Sales.Write");
-        SeedRoleWithPermissions(gateway, "jurol", "8f3c1a94-user", "cajero", "Cashier.Open", "Cashier.Close");
+        Assign(gateway, "jurol", "u1", "vendedor");
+        Assign(gateway, "jurol", "u1", "retired-role");
+        var sut = new EffectivePermissionsService(gateway, Catalog, TestLogger.For<EffectivePermissionsService>());
 
-        var sut = new EffectivePermissionsService(gateway, TestLogger.For<EffectivePermissionsService>());
+        var result = await sut.GetEffectivePermissionsAsync("jurol", "u1");
 
-        var result = await sut.GetEffectivePermissionsAsync("jurol", "8f3c1a94-user");
-
-        result.Should().BeEquivalentTo(["Sales.Read", "Sales.Write", "Cashier.Open", "Cashier.Close"]);
+        result.Should().Equal("Sales.Read", "Sales.Write");
     }
 
     [Fact]
-    public async Task GetEffectivePermissionsAsync_drops_a_permission_reached_through_a_malformed_cross_tenant_assignment()
+    public async Task GetEffectivePermissionsAsync_drops_a_malformed_cross_tenant_assignment()
     {
         var gateway = new FakeOpenFgaGateway();
-        SeedRoleWithPermissions(gateway, "jurol", "8f3c1a94-user", "vendedor", "Sales.Read");
-        gateway.Seed(
-            OpenFgaIdentifiers.User("jurol", "8f3c1a94-user"),
-            OpenFgaIdentifiers.AssigneeRelation,
-            OpenFgaIdentifiers.Role("otraempresa", "comprador"));
-        gateway.Seed(
-            OpenFgaIdentifiers.RoleAssigneeUserset("otraempresa", "comprador"),
-            OpenFgaIdentifiers.GrantedRelation,
-            OpenFgaIdentifiers.Permission("otraempresa", "Purchasing.ApproveOrder"));
+        Assign(gateway, "jurol", "u1", "vendedor");
+        gateway.Seed(OpenFgaIdentifiers.User("jurol", "u1"), OpenFgaIdentifiers.AssigneeRelation, OpenFgaIdentifiers.Role("otraempresa", "comprador"));
+        var sut = new EffectivePermissionsService(gateway, Catalog, TestLogger.For<EffectivePermissionsService>());
 
-        var sut = new EffectivePermissionsService(gateway, TestLogger.For<EffectivePermissionsService>());
+        var result = await sut.GetEffectivePermissionsAsync("jurol", "u1");
 
-        var result = await sut.GetEffectivePermissionsAsync("jurol", "8f3c1a94-user");
-
-        result.Should().BeEquivalentTo(["Sales.Read"]);
+        result.Should().Equal("Sales.Read", "Sales.Write");
     }
 
-    private static void SeedRoleWithPermissions(
-        FakeOpenFgaGateway gateway, string tenant, string subjectId, string roleCode, params string[] permissionCodes)
-    {
-        gateway.Seed(
-            OpenFgaIdentifiers.User(tenant, subjectId),
-            OpenFgaIdentifiers.AssigneeRelation,
-            OpenFgaIdentifiers.Role(tenant, roleCode));
-
-        foreach (var permissionCode in permissionCodes)
-        {
-            gateway.Seed(
-                OpenFgaIdentifiers.RoleAssigneeUserset(tenant, roleCode),
-                OpenFgaIdentifiers.GrantedRelation,
-                OpenFgaIdentifiers.Permission(tenant, permissionCode));
-        }
-    }
+    private static void Assign(FakeOpenFgaGateway gateway, string tenant, string subjectId, string roleCode)
+        => gateway.Seed(OpenFgaIdentifiers.User(tenant, subjectId), OpenFgaIdentifiers.AssigneeRelation, OpenFgaIdentifiers.Role(tenant, roleCode));
 }

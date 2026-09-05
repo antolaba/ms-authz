@@ -112,37 +112,4 @@ public class AuthzAdminClientTests
         // as a plain HttpRequestException, same as GetEffectivePermissionsAsync's EnsureSuccessStatusCode.
         await act.Should().ThrowAsync<HttpRequestException>();
     }
-
-    [Fact]
-    public async Task SyncCatalogAsync_PostsTenantCodes_AndParsesSyncedTenantList()
-    {
-        // Arrange
-        var handler = new StubHttpMessageHandler(HttpStatusCode.OK, """["jurol","otraempresa"]""");
-        var client = CreateClient(handler);
-
-        // Act
-        var synced = await client.SyncCatalogAsync(["jurol", "otraempresa"]);
-
-        // Assert
-        synced.Should().BeEquivalentTo(["jurol", "otraempresa"]);
-        handler.LastRequest!.Method.Should().Be(HttpMethod.Post);
-        handler.LastRequest.RequestUri!.PathAndQuery.Should().Be("/catalog/sync");
-        handler.LastRequestBody.Should().Be("""{"tenantCodes":["jurol","otraempresa"]}""");
-    }
-
-    [Fact]
-    public async Task SyncCatalogAsync_EmptyTenantList_ThrowsAuthzInvalidRequestExceptionWithProblemDetail()
-    {
-        // Arrange
-        var handler = new StubHttpMessageHandler(HttpStatusCode.BadRequest,
-            """{"status":400,"title":"Invalid request","detail":"'tenantCodes' is required."}""");
-        var client = CreateClient(handler);
-
-        // Act
-        var act = () => client.SyncCatalogAsync([]);
-
-        // Assert
-        (await act.Should().ThrowAsync<AuthzInvalidRequestException>())
-            .WithMessage("'tenantCodes' is required.");
-    }
 }

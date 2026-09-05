@@ -5,8 +5,4 @@ type user
 
 type role
   relations
-    define assignee: [user, role#assignee]
-
-type permission
-  relations
-    define granted: [role#assignee]
+    define assignee: [user]

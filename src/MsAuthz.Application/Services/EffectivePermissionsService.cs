@@ -6,6 +6,7 @@ namespace MsAuthz.Application.Services;
 
 public class EffectivePermissionsService(
     IOpenFgaGateway openFgaGateway,
+    ICatalogRepository catalogRepository,
     ILogger<EffectivePermissionsService> logger) : IEffectivePermissionsService
 {
     public async Task<IReadOnlyList<string>> GetEffectivePermissionsAsync(
@@ -16,21 +17,40 @@ public class EffectivePermissionsService(
             new { TenantCode = tenantCode, SubjectId = subjectId });
 
         var user = OpenFgaIdentifiers.User(tenantCode, subjectId);
+        var roleObjects = await openFgaGateway.ReadObjectsForUserAsync(
+            user, OpenFgaIdentifiers.AssigneeRelation, OpenFgaIdentifiers.RoleType, cancellationToken);
 
-        var objects = await openFgaGateway.ListObjectsAsync(
-            user, OpenFgaIdentifiers.GrantedRelation, OpenFgaIdentifiers.PermissionType, cancellationToken);
-
-        var permissionCodes = new SortedSet<string>(StringComparer.Ordinal);
-        foreach (var permissionObject in objects)
+        var assignedCodes = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var roleObject in roleObjects)
         {
-            if (OpenFgaIdentifiers.TryStripTenantPrefix(permissionObject, tenantCode, out var permissionCode))
-                permissionCodes.Add(permissionCode);
+            if (OpenFgaIdentifiers.TryStripTenantRolePrefix(roleObject, tenantCode, out var roleCode))
+                assignedCodes.Add(roleCode);
         }
 
+        var catalogRoles = await catalogRepository.GetRolesAsync(cancellationToken);
+        var permissionCodes = new SortedSet<string>(StringComparer.Ordinal);
+        var unknownCodes = new List<string>();
+
+        foreach (var code in assignedCodes)
+        {
+            var role = catalogRoles.FirstOrDefault(r => r.Code == code);
+            if (role is null)
+            {
+                unknownCodes.Add(code);
+                continue;
+            }
+
+            permissionCodes.UnionWith(role.PermissionCodes);
+        }
+
+        if (unknownCodes.Count > 0)
+            logger.LogWarning(
+                "Subject {SubjectId} in tenant {TenantCode} is assigned role(s) {UnknownCodes} that are not in the catalog; ignoring them",
+                subjectId, tenantCode, unknownCodes);
+
         logger.LogInformation(
-            "Resolved {PermissionCount} effective permission(s) for subject {SubjectId} in tenant {TenantCode} " +
-            "(OpenFGA returned {RawObjectCount} object(s) before filtering)",
-            permissionCodes.Count, subjectId, tenantCode, objects.Count);
+            "Resolved {PermissionCount} effective permission(s) from {RoleCount} role(s) for subject {SubjectId} in tenant {TenantCode}",
+            permissionCodes.Count, assignedCodes.Count, subjectId, tenantCode);
 
         return permissionCodes.ToList();
     }

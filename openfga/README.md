@@ -1,8 +1,9 @@
 # Modelo de autorización OpenFGA
 
 El modelo es uno de los tres artefactos que se comparten entre sistemas, junto con el código de este
-repo y el paquete `Authz.Client`. Es el mismo para todos y no cambia por feature: roles y permisos
-concretos son tuplas, no tipos del modelo.
+repo y el paquete `Authz.Client`. Es el mismo para todos y es mínimo a propósito: OpenFGA guarda sólo
+asignaciones (`user:<tenant>|<subject> assignee role:<tenant>|<code>`). Qué permisos otorga cada rol
+lo resuelve `ms-authz` desde el catálogo en memoria, así que el modelo no necesita saber de permisos.
 
 ## Archivos
 
@@ -13,9 +14,8 @@ concretos son tuplas, no tipos del modelo.
   ```bash
   fga model transform --file model.fga > model.json
   ```
-- `model.fga.yaml` — suite de `fga model test`. Es la única prueba ejecutable de la semántica del
-  modelo: dirección de la jerarquía de roles, aislamiento entre tenants, y por qué `ms-authz` filtra
-  por prefijo de tenant además de scopear el user.
+- `model.fga.yaml` — suite de `fga model test`: asignación directa, aislamiento entre tenants por
+  el tenant dentro del user, y que el `Read` de roles de un user devuelve sólo los de su tenant.
 
 ## Correr la suite
 
@@ -31,20 +31,7 @@ Salida esperada:
 
 ```
 # Test Summary #
-Tests 8/8 passing
-Checks 12/12 passing
-ListObjects 3/3 passing
+Tests 3/3 passing
+Checks 4/4 passing
+ListObjects 2/2 passing
 ```
-
-## Qué cubre cada caso
-
-| # | Caso | Resultado |
-|---|---|---|
-| 1 | Permiso directo por rol | `true` |
-| 2 | Permiso que el usuario no tiene | `false` |
-| 3 | Unión de dos roles del mismo tenant | `true` en ambos permisos |
-| 4 | Jerarquía de roles (gerente hereda de vendedor, no al revés) | `true` para lo heredado, `false` en la dirección inversa |
-| 5 | Aislamiento entre tenants, contra permisos que sí están concedidos en el otro tenant | `false` |
-| 6 | Usuario sin roles | `false` |
-| 7 | `ListObjects(user:<tenant>\|x, granted, permission)` queda acotado al tenant que lleva el user | Sólo los permisos de ese tenant |
-| 8 | Asignación cruzada malformada (`user:jurol\|x` sobre `role:otraempresa\|admin`) | `ListObjects` **sí** la devuelve: por eso `ms-authz` mantiene el filtro por prefijo como defensa |

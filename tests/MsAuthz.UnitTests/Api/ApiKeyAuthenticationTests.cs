@@ -22,7 +22,7 @@ public class ApiKeyAuthenticationTests(MsAuthzApiFactory factory) : IClassFixtur
     {
         var client = factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/catalog/sync", new { tenantCodes = new[] { "jurol" } });
+        var response = await client.PutAsJsonAsync("/users/u1/roles?tenant=jurol", new { roleCodes = Array.Empty<string>() });
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -33,7 +33,7 @@ public class ApiKeyAuthenticationTests(MsAuthzApiFactory factory) : IClassFixtur
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ApiKeyAuthenticationDefaults.HeaderName, "wrong-key");
 
-        var response = await client.PostAsJsonAsync("/catalog/sync", new { tenantCodes = new[] { "jurol" } });
+        var response = await client.PutAsJsonAsync("/users/u1/roles?tenant=jurol", new { roleCodes = Array.Empty<string>() });
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -44,7 +44,7 @@ public class ApiKeyAuthenticationTests(MsAuthzApiFactory factory) : IClassFixtur
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ApiKeyAuthenticationDefaults.HeaderName, MsAuthzApiFactory.ApiKey);
 
-        var response = await client.PostAsJsonAsync("/catalog/sync", new { tenantCodes = new[] { "jurol" } });
+        var response = await client.PutAsJsonAsync("/users/u1/roles?tenant=jurol", new { roleCodes = Array.Empty<string>() });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -55,7 +55,7 @@ public class ApiKeyAuthenticationTests(MsAuthzApiFactory factory) : IClassFixtur
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(ApiKeyAuthenticationDefaults.HeaderName, MsAuthzApiFactory.ApiKey);
 
-        var response = await client.PostAsJsonAsync("/catalog/sync", new { tenantCodes = new[] { "acme|prod" } });
+        var response = await client.PutAsJsonAsync("/users/u1/roles?tenant=acme|prod", new { roleCodes = Array.Empty<string>() });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }

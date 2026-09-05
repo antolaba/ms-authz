@@ -6,17 +6,14 @@ using OpenFga.Sdk.Client.Model;
 namespace MsAuthz.Infrastructure.OpenFga;
 
 /// <summary>
-/// The only class in ms-authz that talks to OpenFGA (MS-AUTHZ-SPEC.md §1). Everything else goes
-/// through <see cref="IOpenFgaGateway"/>.
+/// The only class in ms-authz that reads or writes OpenFGA tuples. Everything else goes through
+/// <see cref="IOpenFgaGateway"/>.
 /// </summary>
 public class OpenFgaGateway(OpenFgaClient client, ILogger<OpenFgaGateway> logger) : IOpenFgaGateway
 {
     /// <summary>
-    /// OpenFGA rejects a Write with more than 100 operations in a single transaction
-    /// ("The number of write operations exceeds the allowed limit of 100"). Provisioning a tenant
-    /// materialises the whole catalog at once — 222 tuples for the current one (MS-AUTHZ-SPEC.md §5)
-    /// — so writes have to be chunked. Kept below the limit rather than at it, since the cap is a
-    /// server-side setting that a future OpenFGA release or a self-hosted config could lower.
+    /// OpenFGA rejects a Write with more than 100 operations in a single transaction, so writes are
+    /// chunked. Kept below the limit rather than at it, since the cap is a server-side setting.
     /// </summary>
     private const int MaxOperationsPerWrite = 50;
 
@@ -26,8 +23,8 @@ public class OpenFgaGateway(OpenFgaClient client, ILogger<OpenFgaGateway> logger
             return;
 
         // OnDuplicateWrites.Ignore is what makes this idempotent: writing a tuple that already
-        // exists is a silent no-op instead of an error (MS-AUTHZ-SPEC.md §5). That idempotency is
-        // also what makes chunking safe: a batch that fails half-way can simply be re-run.
+        // exists is a silent no-op instead of an error. That idempotency is also what makes chunking
+        // safe: a batch that fails half-way can simply be re-run.
         var options = new ClientWriteOptions
         {
             Conflict = new ConflictOptions { OnDuplicateWrites = OnDuplicateWrites.Ignore },
@@ -99,15 +96,5 @@ public class OpenFgaGateway(OpenFgaClient client, ILogger<OpenFgaGateway> logger
         } while (continuationToken is not null);
 
         return objects;
-    }
-
-    public async Task<IReadOnlyList<string>> ListObjectsAsync(
-        string userId, string relation, string objectType, CancellationToken cancellationToken = default)
-    {
-        var request = new ClientListObjectsRequest { User = userId, Relation = relation, Type = objectType };
-
-        var response = await client.ListObjects(request, cancellationToken: cancellationToken);
-
-        return response.Objects ?? [];
     }
 }

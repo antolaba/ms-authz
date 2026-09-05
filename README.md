@@ -25,13 +25,14 @@ compose network only.
 
 ## What it is
 
-- **A readable catalog.** OpenFGA stores structure, not names or descriptions. `role:jurol|vendedor`
-  has no display name in OpenFGA — that lives in a JSON file (`Catalog:Path`, see docs/catalog.example.json
-  for the shape), loaded once at startup. ms-authz has no database of its own.
-- **A translator from business operations to OpenFGA tuples.** "Assign the Vendedor role to this user
-  in jurol" becomes a `Write` of tuples. "Provision tenant jurol" expands the whole catalog into
-  tuples for that tenant. Consuming systems never write OpenFGA tuples by hand — **ms-authz is the
-  only thing that talks to OpenFGA.**
+- **A catalog.** Roles, the permissions each one carries (directly or by including other roles),
+  and their names and descriptions live in a JSON file (`Catalog:Path`, see docs/catalog.example.json
+  for the shape), loaded and validated once at startup and served from memory. ms-authz has no
+  database of its own.
+- **Role assignments in OpenFGA.** "Assign the Vendedor role to this user in jurol" becomes one tuple,
+  `user:jurol|<subject> assignee role:jurol|vendedor`. That is the only kind of tuple in the store.
+  Consuming systems never write OpenFGA tuples by hand — **ms-authz is the only thing that talks to
+  OpenFGA.**
 - **The hot-path endpoint**: `GET /me/permissions`, which every business request ultimately depends
   on (through `Authz.Client`'s cache — see below).
 
@@ -44,20 +45,20 @@ repo concatenates these strings by hand.
 |---|---|---|
 | User | `user:<tenant>\|<subject id>` | `user:jurol\|8f3c1a94-...` |
 | Role | `role:<tenant>\|<role code>` | `role:jurol\|vendedor` |
-| Permission | `permission:<tenant>\|<Modulo.Accion>` | `permission:jurol\|Sales.Write` |
 
 The separator is `|`, **never `#`** — `#` is OpenFGA's reserved userset separator
 (`object#relation`).
 
-**Why the subject carries the tenant too.** OpenFGA has no notion of tenant, and its non-streaming
-`ListObjects` silently truncates at a server-side cap (1000 results and a 3s deadline by default).
-With a bare `user:<subject>` the query would return that subject's permissions across every tenant
-before ms-authz could filter, so a subject with roles in enough tenants would lose permissions at
-random. With `user:<tenant>|<subject>` the same person in two tenants is two OpenFGA users, and the
-result of `ListObjects` is bounded by one tenant's catalog. This matches reality: each tenant is its
-own Keycloak realm, so the subject id is per tenant anyway. `EffectivePermissionsService` still
-filters by the `permission:<tenant>|` prefix as defence in depth; both behaviours are covered by
-`tests/MsAuthz.UnitTests/Services/EffectivePermissionsServiceTests.cs` and by `openfga/model.fga.yaml`.
+**Why the subject carries the tenant too.** OpenFGA has no notion of tenant. With
+`user:<tenant>|<subject>` the same person in two tenants is two OpenFGA users, so reading a user's
+roles can only ever return that tenant's assignments. This matches reality: each tenant is its own
+Keycloak realm, so the subject id is per tenant anyway. Services still filter by the `role:<tenant>|`
+prefix as defence in depth against a malformed tuple.
+
+**How `GET /me/permissions` resolves.** One paginated `Read` of the subject's `role:` assignments in
+the tenant, then a lookup of each role in the in-memory catalog and a union of their permission codes.
+OpenFGA is not asked to evaluate anything, so there is nothing to materialise per tenant and a
+catalog change applies to every tenant on the next deploy.
 
 ## Endpoints (all behind the API key — MS-AUTHZ-SPEC.md §7)
 
@@ -67,7 +68,6 @@ filters by the `permission:<tenant>|` prefix as defence in depth; both behaviour
 | `GET /roles` | Readable catalog (roles + the permission codes each carries). |
 | `GET /users/{id}/roles?tenant=` | Roles currently assigned to a user in a tenant. |
 | `PUT /users/{id}/roles?tenant=` | Replaces the user's role set in that tenant. Body: `{ "roleCodes": [...] }`. |
-| `POST /catalog/sync` | Expands the catalog into tuples for the given tenants. Call it when a tenant is created and again after any catalog change. Body: `{ "tenantCodes": ["jurol", "..."] }`. ms-authz has no list of tenants of its own, so the caller supplies it. Idempotent. |
 | `GET /health` | Liveness, no API key required. |
 
 ## Running locally
@@ -82,6 +82,7 @@ live stack:
    `openfga/model.json`, generated from the canonical `openfga/model.fga` (see `openfga/README.md`).
    Set `OpenFga:StoreId` / `OpenFga:AuthorizationModelId` only if you want to pin a specific one.
    If OpenFGA is not up yet, ms-authz retries for about thirty seconds and then fails to start.
+   There is no per-tenant setup: a tenant exists in ms-authz as soon as a role is assigned in it.
 2. A catalog file — `Catalog:Path` in configuration, defaulting to `catalog.json` next to the binary.
    `docs/catalog.example.json` is a small generic example (`appsettings.Development.json` already
    points at it); a real deployment supplies its own.
@@ -154,8 +155,7 @@ public class EstudioContableAuthzRequestContextAccessor(IRequestContext requestC
 
 A system with no notion of tenant still needs one for ms-authz — the tenant is the namespace every
 role and permission tuple lives in, and OpenFGA has no other way to keep two deployments' data apart in
-one store. Pick a constant (`default` works), sync it once into ms-authz, and configure it as
-`Authz:DefaultTenantCode`. `PermissionAuthorizationBehavior` uses it whenever the accessor's
+one store. Pick a constant (`default` works) and configure it as `Authz:DefaultTenantCode`. `PermissionAuthorizationBehavior` uses it whenever the accessor's
 `TenantCode` is null, so the accessor only has to resolve the subject:
 
 ```csharp
@@ -164,11 +164,6 @@ public class SingleTenantAuthzRequestContextAccessor(IHttpContextAccessor httpCo
     public string? TenantCode => null;
     public string? SubjectId => httpContextAccessor.HttpContext?.User.FindFirst("sub")?.Value;
 }
-```
-
-```bash
-curl -X POST http://ms-authz:6010/catalog/sync -H "X-Api-Key: $KEY" \
-  -H "Content-Type: application/json" -d '{"tenantCodes":["default"]}'
 ```
 
 A subject that cannot be resolved is still denied, default tenant or not.
@@ -199,8 +194,7 @@ same 403.
 ### `IAuthzAdminClient`
 
 Uncached administration operations, registered separately via `AddAuthzAdminClient`: reading the
-role catalog, reading/replacing a user's roles, and `SyncCatalogAsync(tenantCodes)` — the
-client-side call for `POST /catalog/sync`.
+role catalog and reading/replacing a user's roles.
 
 ## Repository layout
 
@@ -211,7 +205,7 @@ src/
   MsAuthz.Infrastructure/   Catalog file loader + the OpenFGA client
   Authz.Client/             NuGet SDK for .NET consumers
 tests/
-  MsAuthz.UnitTests/        Identifiers, tenant filtering, idempotent materialization, catalog loading
+  MsAuthz.UnitTests/        Identifiers, tenant filtering, role replacement, catalog loading, OpenFGA bootstrap
   Authz.Client.UnitTests/   Attribute/extension + pipeline-behavior tests
 docs/                       MS-AUTHZ-SPEC.md and the example catalog file
 docker/                     Dockerfile lives in src/MsAuthz.Api; compose fragment lives here

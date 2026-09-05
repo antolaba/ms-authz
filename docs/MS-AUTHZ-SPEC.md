@@ -584,3 +584,17 @@ tiene ninguno. El modelo va embebido en el assembly como `openfga/model.json`, g
 `model.fga` canónico. Si OpenFGA todavía no responde, reintenta unos 30 segundos y después no levanta.
 Desplegar un sistema nuevo queda en: OpenFGA, el `catalog.json`, `ms-authz`, y un `POST /catalog/sync`.
 La CLI `fga` queda como herramienta de desarrollo para correr `model.fga.yaml`, nada más.
+
+**OpenFGA guarda sólo asignaciones; los permisos se resuelven desde el catálogo en memoria.** La
+materialización rol→permiso por tenant (§5) existía únicamente para que OpenFGA pudiera evaluar
+`user → rol → permiso` con `ListObjects`. Con el catálogo ya en memoria, esa copia era la segunda fuente
+de verdad de la misma relación, y arrastraba el job de sync, el desfasaje al cambiar el catálogo, las
+tuplas huérfanas al borrar un rol y el tope de `ListObjects`. Ahora el store tiene un solo tipo de
+tupla, `user:<t>|<sub> assignee role:<t>|<code>`, y `GET /me/permissions` hace un `Read` paginado de
+los roles del user y une los permisos de cada uno desde el catálogo. Desaparecen `POST /catalog/sync`,
+`SyncCatalogAsync`, y cualquier paso por tenant: un tenant existe en `ms-authz` desde la primera
+asignación. La jerarquía de roles (§3) pasa del modelo al catálogo (`"includes": ["vendedor"]`),
+expandida al cargar. El modelo DSL queda reducido a `user` y `role.assignee: [user]`. Lo que se
+resigna: OpenFGA no evalúa nada y un `Check` directo contra el store no responde permisos; sólo
+`ms-authz` puede, que es lo que el §1 ya establecía. El camino a ReBAC (§3) sigue abierto como tipos
+nuevos al lado de `role`.

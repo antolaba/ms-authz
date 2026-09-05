@@ -27,6 +27,13 @@
       "name": "Warehouse",
       "description": "Inventory: stock, receipts and adjustments",
       "permissions": ["Inventory.Read", "Inventory.Write", "Inventory.Adjust"]
+    },
+    {
+      "code": "manager",
+      "name": "Manager",
+      "description": "Everything a seller can do, plus voiding sales",
+      "permissions": ["Sales.Void"],
+      "includes": ["seller"]
     }
   ]
 }

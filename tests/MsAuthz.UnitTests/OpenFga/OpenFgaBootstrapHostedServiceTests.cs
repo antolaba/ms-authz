@@ -87,8 +87,7 @@ public class OpenFgaBootstrapHostedServiceTests
 
         var model = WriteAuthorizationModelRequest.FromJson(adminApi.LastWrittenModelJson!);
         model.SchemaVersion.Should().Be("1.1");
-        model.TypeDefinitions.Select(t => t.Type).Should().BeEquivalentTo(["user", "role", "permission"]);
+        model.TypeDefinitions.Select(t => t.Type).Should().BeEquivalentTo(["user", "role"]);
         model.TypeDefinitions.Single(t => t.Type == "role").Relations.Should().ContainKey("assignee");
-        model.TypeDefinitions.Single(t => t.Type == "permission").Relations.Should().ContainKey("granted");
     }
 }
