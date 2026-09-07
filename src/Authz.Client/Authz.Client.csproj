@@ -11,7 +11,7 @@
          every .NET system that wants ms-authz enforcement: pull-cached IAuthzClient,
          RequirePermissionAttribute, and the MediatR PermissionAuthorizationBehavior. -->
     <PackageId>Authz.Client</PackageId>
-    <Version>1.2.0</Version>
+    <Version>1.0.0</Version>
     <Authors>Estudio-Martinez</Authors>
     <Description>Client SDK for ms-authz: pull-cached effective-permissions lookup, RequirePermissionAttribute, a MediatR pipeline behavior enforcing it, and IAuthzAdminClient for role-administration operations (catalog listing, reading/replacing a user's roles).</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
