@@ -25,8 +25,14 @@ public class ApiKeyAuthenticationHandler(
     {
         if (!Request.Headers.TryGetValue(ApiKeyAuthenticationDefaults.HeaderName, out var providedKeys))
         {
-            return Task.FromResult(AuthenticateResult.Fail(
-                $"Missing '{ApiKeyAuthenticationDefaults.HeaderName}' header."));
+            // NoResult, not Fail: "no trajo credenciales" no es lo mismo que "trajo credenciales
+            // invalidas". Fail hace que el framework loguee un fallo de autenticacion en cada
+            // request sin header -- incluido el HEALTHCHECK del Dockerfile, que pega a /health
+            // (anonimo) cada 30s y llenaba el log de qa con "Missing 'X-Api-Key' header".
+            // El middleware de autorizacion sigue rechazando igual: sin principal, un endpoint
+            // protegido responde 401 lo mismo que antes. Una key presente pero equivocada sigue
+            // siendo Fail + Warning, que es la senal que si interesa mirar.
+            return Task.FromResult(AuthenticateResult.NoResult());
         }
 
         var providedKey = providedKeys.ToString();
