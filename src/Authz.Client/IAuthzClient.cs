@@ -12,4 +12,6 @@ public interface IAuthzClient
     /// </summary>
     Task<IReadOnlyCollection<string>> GetEffectivePermissionsAsync(
         string tenantCode, string subjectId, CancellationToken cancellationToken = default);
+
+    Task InvalidateAsync(string tenantCode, string subjectId, CancellationToken cancellationToken = default);
 }

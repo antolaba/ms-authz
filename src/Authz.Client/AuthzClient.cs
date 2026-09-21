@@ -42,6 +42,17 @@ public class AuthzClient(
         return permissions;
     }
 
+    public Task InvalidateAsync(string tenantCode, string subjectId, CancellationToken cancellationToken = default)
+    {
+        cache.Remove(BuildCacheKey(tenantCode, subjectId));
+
+        logger.LogDebug(
+            "Invalidated cached effective permissions (tenant {TenantCode}, subject {SubjectId})",
+            tenantCode, subjectId);
+
+        return Task.CompletedTask;
+    }
+
     private sealed record CacheKey(string TenantCode, string SubjectId);
 
     private static CacheKey BuildCacheKey(string tenantCode, string subjectId)

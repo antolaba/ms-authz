@@ -47,4 +47,41 @@ public class AuthzClientTests
         second.Should().BeEquivalentTo(["Iam.Read"]);
         handler.RequestedUris.Should().HaveCount(2);
     }
+
+    [Fact]
+    public async Task InvalidateAsync_forces_the_next_call_for_that_pair_to_re_hit_ms_authz()
+    {
+        var handler = new SequencedHttpMessageHandler(
+            (HttpStatusCode.OK, """["Sales.Read"]"""),
+            (HttpStatusCode.OK, """["Sales.Read","Sales.Write"]"""));
+        var cache = new MemoryCache(new MemoryCacheOptions());
+        var client = CreateClient(handler, cache);
+
+        await client.GetEffectivePermissionsAsync("jurol", "user-1");
+        await client.InvalidateAsync("jurol", "user-1");
+        var afterInvalidation = await client.GetEffectivePermissionsAsync("jurol", "user-1");
+
+        afterInvalidation.Should().BeEquivalentTo(["Sales.Read", "Sales.Write"]);
+        handler.RequestedUris.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task InvalidateAsync_does_not_evict_a_different_tenant_subject_pair()
+    {
+        var handler = new SequencedHttpMessageHandler(
+            (HttpStatusCode.OK, """["Sales.Read"]"""),
+            (HttpStatusCode.OK, """["Iam.Read"]"""));
+        var cache = new MemoryCache(new MemoryCacheOptions());
+        var client = CreateClient(handler, cache);
+
+        await client.GetEffectivePermissionsAsync("jurol", "user-1");
+        await client.GetEffectivePermissionsAsync("jurol", "user-2");
+
+        await client.InvalidateAsync("jurol", "user-1");
+
+        var stillCached = await client.GetEffectivePermissionsAsync("jurol", "user-2");
+
+        stillCached.Should().BeEquivalentTo(["Iam.Read"]);
+        handler.RequestedUris.Should().HaveCount(2);
+    }
 }

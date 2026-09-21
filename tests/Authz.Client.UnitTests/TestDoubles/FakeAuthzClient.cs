@@ -17,4 +17,7 @@ public class FakeAuthzClient : IAuthzClient
         LastTenantCode = tenantCode;
         return Task.FromResult<IReadOnlyCollection<string>>(_permissions);
     }
+
+    public Task InvalidateAsync(string tenantCode, string subjectId, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
 }
